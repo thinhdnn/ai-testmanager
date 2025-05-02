@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - ENV=production
+      - NEXT_PUBLIC_DATABASE_API_KEY=playwright-gemini-secret-key-change-in-production
+      - DATABASE_API_KEY=playwright-gemini-secret-key-change-in-production
+      - DATABASE_URL=file:/app/prisma/dev.db
+      - NEXT_PUBLIC_SKIP_DB_CHECKS=false
+    volumes:
+      - ../ai-test-management-db/dev.db:/app/prisma/dev.db
+      - ../ai-test-management-playwright-projects:/app/playwright-projects
+    working_dir: /app
+
+  prisma-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5555:5555"
+    environment:
+      - DATABASE_URL=file:/app/prisma/dev.db
+    volumes:
+      - ../ai-test-management-db/dev.db:/app/prisma/dev.db
+    working_dir: /app
+    command: npx prisma studio --port 5555

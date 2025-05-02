@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Project model - represents a managed Playwright project
+model Project {
+  id                    String                 @id @default(uuid())
+  name                  String
+  url                   String
+  description           String?
+  environment           String                 @default("development")
+  playwrightProjectPath String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  createdBy             String?
+  updatedBy             String?
+  lastRunBy             String?
+  lastRun               DateTime?
+  testCases             TestCase[]
+  testResults           TestResultHistory[]
+  fixtures              Fixture[]
+  permissions           PermissionAssignment[] @relation("ProjectPermissions")
+  @@map("projects")
+}
+
+// TestCase model - represents a test case within a project
+model TestCase {
+  id                   String              @id @default(uuid())
+  order                Int?                 @default(0)
+  projectId            String
+  name                 String
+  status               String              @default("pending")
+  version              String              @default("1.0.0")
+  isManual             Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  lastRun              DateTime?
+  updatedAt            DateTime            @updatedAt
+  createdBy            String?
+  updatedBy            String?
+  lastRunBy            String?
+  tags                 String?
+  testFilePath         String?
+  playwrightScript String?
+  project              Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  testResults          TestResultHistory[]
+  Steps            Step[]
+  versions             TestCaseVersion[]
+  permissions          PermissionAssignment[] @relation("TestCasePermissions")
+}
+
+// Step model - represents a step within a test case
+model Step {
+  id             String   @id @default(uuid())
+  testCaseId     String?
+  fixtureId      String?
+  action         String
+  data           String?
+  expected       String?
+  playwrightScript String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String?
+  updatedBy      String?
+  order          Int
+  disabled       Boolean  @default(false)
+  testCase       TestCase? @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  fixture        Fixture? @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+}
+
+// Fixture model - represents reusable test data or logic
+model Fixture {
+  id          String    @id @default(uuid())
+  projectId   String
+  name        String
+  playwrightScript String?
+  type        String    @default("data")
+  filename    String?
+  exportName  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  steps       Step[]
+  versions    FixtureVersion[]
+  fixtureFilePath String?
+}
+
+// TestResultHistory model - stores test execution logs
+model TestResultHistory {
+  id            String    @id @default(uuid())
+  projectId     String
+  testCaseId    String?
+  success       Boolean
+  status        String
+  executionTime Int?
+  output        String?
+  errorMessage  String?
+  resultData    String?
+  createdAt     DateTime  @default(now())
+  createdBy     String?
+  lastRunBy     String?
+  browser       String?
+  videoUrl      String?
+  testCase      TestCase? @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// User model - for authentication and authorization
+model User {
+  id          String   @id @default(uuid())
+  username    String   @unique
+  email       String?
+  password    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  permissions PermissionAssignment[] @relation("UserPermissions")
+  roles       UserRole[]
+}
+
+model Setting {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      String
+  userId     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  createdBy  String?
+  updatedBy  String?
+}
+
+// RBAC Models
+model Permission {
+  id             String                 @id @default(uuid())
+  name           String                 @unique
+  description    String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  rolePermissions RolePermission[]
+  permissionAssignments PermissionAssignment[]
+}
+
+model Role {
+  id             String           @id @default(uuid())
+  name           String           @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  permissions    RolePermission[]
+  users          UserRole[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+}
+
+model PermissionAssignment {
+  id            String     @id @default(uuid())
+  userId        String
+  permissionId  String
+  resourceType  String
+  resourceId    String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user          User       @relation("UserPermissions", fields: [userId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  project       Project?   @relation("ProjectPermissions", fields: [resourceId], references: [id], onDelete: Cascade)
+  testCase      TestCase?  @relation("TestCasePermissions", fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId, resourceType, resourceId])
+}
+
+// TestCaseVersion model - for versioning test cases
+model TestCaseVersion {
+  id                   String              @id @default(uuid())
+  testCaseId           String
+  version              String
+  name                 String
+  description          String?
+  playwrightScript String?
+  createdAt            DateTime            @default(now())
+  createdBy            String?
+  testCase             TestCase            @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  stepVersions     StepVersion[]
+}
+
+// StepVersion model - for versioning steps
+model StepVersion {
+  id             String           @id @default(uuid())
+  testCaseVersionId String?
+  fixtureVersionId String?
+  action         String
+  data           String?
+  expected       String?
+  playwrightCode String?
+  selector       String?
+  order          Int
+  disabled       Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  createdBy      String?
+  testCaseVersion TestCaseVersion? @relation(fields: [testCaseVersionId], references: [id], onDelete: Cascade)
+  fixtureVersion FixtureVersion? @relation(fields: [fixtureVersionId], references: [id], onDelete: Cascade)
+}
+
+model FixtureVersion {
+  id                   String              @id @default(uuid())
+  fixtureId           String
+  version              String
+  name                 String
+  description          String?
+  content              String?
+  playwrightScript String?
+  createdAt            DateTime            @default(now())
+  createdBy            String?
+  fixture             Fixture            @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  stepVersions     StepVersion[]
+}
+
+// Tag model - for tagging test cases
+model Tag {
+  id        String   @id @default(cuid())
+  value     String
+  label     String?
+  projectId String?  // Optional projectId allows for global tags
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Create a unique constraint that works with optional projectId
+  @@unique(fields: [projectId, value], name: "tag_projectId_value")
+}

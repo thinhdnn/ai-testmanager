@@ -1,0 +1,37 @@
+import { test as base, Page } from '@playwright/test';
+
+interface FixtureNameFixtures {
+  fixtureName: Page;
+}
+
+export const test = base.extend<FixtureNameFixtures>({
+  fixtureName: async ({ page }, use) => {
+    await use(page);
+  }
+});
+
+// @ts-check
+/**
+ * {{name}} {{type}} fixture
+ * {{#if description}}
+ * {{description}}
+ * {{/if}}
+ */
+
+{{#if type === 'data'}}
+/**
+ * {{name}} data
+ * @returns {Object} The fixture data
+ */
+exports.{{exportName}} = {
+  {{content}}
+};
+{{else}}
+/**
+ * {{name}} logic 
+ * @returns {Function} The fixture function
+ */
+exports.{{exportName}} = async function({{params}}) {
+  {{content}}
+};
+{{/if}} 

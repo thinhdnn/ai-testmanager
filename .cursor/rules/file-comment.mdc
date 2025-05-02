@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- Minimize comments in the code. Only include comments when absolutely necessary for clarity, and write them in English using clear, concise language.

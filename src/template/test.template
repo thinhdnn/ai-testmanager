@@ -1,0 +1,40 @@
+// @ts-check
+const { test, expect } = require('@playwright/test');
+{{#if fixtures}}
+// Fixtures
+{{#each fixtures}}
+const { {{name}} } = require('{{path}}');
+{{/each}}
+{{/if}}
+
+test.describe('{{testCaseName}}', () => {
+  {{#if setup}}
+  test.beforeEach(async ({ page }) => {
+    {{#each setup}}
+    // {{comment}}
+    {{{playwrightCode}}}
+    {{/each}}
+  });
+  {{/if}}
+
+  test('{{testCaseName}}', async ({ page }) => {
+    // Test Steps
+    {{#each steps}}
+    // Step {{order}}: {{action}}
+    {{{playwrightCode}}}
+    {{#if expected}}
+    // Expect: {{expected}}
+    {{/if}}
+    
+    {{/each}}
+  });
+
+  {{#if teardown}}
+  test.afterEach(async ({ page }) => {
+    {{#each teardown}}
+    // {{comment}}
+    {{{playwrightCode}}}
+    {{/each}}
+  });
+  {{/if}}
+}); 
