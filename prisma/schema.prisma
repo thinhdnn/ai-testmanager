@@ -24,8 +24,26 @@ model Project {
   testCases             TestCase[]
   testResults           TestResultHistory[]
   fixtures              Fixture[]
+  settings              ProjectSetting[]
   permissions           PermissionAssignment[] @relation("ProjectPermissions")
   @@map("projects")
+}
+
+// ProjectSetting model - stores Playwright configuration settings for projects
+model ProjectSetting {
+  id            String    @id @default(uuid())
+  projectId     String
+  category      String    // 'playwright', 'browser', 'network', etc.
+  key           String    // setting name e.g. 'browser', 'timeout', 'workers'
+  value         String    // setting value as string (can be parsed as needed)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdBy     String?
+  updatedBy     String?
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, category, key])
+  @@map("project_settings")
 }
 
 // TestCase model - represents a test case within a project
@@ -78,7 +96,7 @@ model Fixture {
   projectId   String
   name        String
   playwrightScript String?
-  type        String    @default("data")
+  type        String    @default("extend")   // extend and inline
   filename    String?
   exportName  String?
   createdAt   DateTime  @default(now())

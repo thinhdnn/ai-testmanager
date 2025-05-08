@@ -1,16 +1,5 @@
-import { test as base, Page } from '@playwright/test';
+import { test as base, Page, expect } from '@playwright/test';
 
-interface FixtureNameFixtures {
-  fixtureName: Page;
-}
-
-export const test = base.extend<FixtureNameFixtures>({
-  fixtureName: async ({ page }, use) => {
-    await use(page);
-  }
-});
-
-// @ts-check
 /**
  * {{name}} {{type}} fixture
  * {{#if description}}
@@ -18,20 +7,51 @@ export const test = base.extend<FixtureNameFixtures>({
  * {{/if}}
  */
 
-{{#if type === 'data'}}
-/**
- * {{name}} data
- * @returns {Object} The fixture data
- */
-exports.{{exportName}} = {
-  {{content}}
+{{#if (eq type "data")}}
+// Declare the types of fixtures
+type {{exportName}} = {
+  execute: () => Promise<void>;
 };
+
+type {{exportName}}Fixtures = {
+  {{exportName}}: {{exportName}};
+};
+
+// Extend base test by providing "{{exportName}}"
+export const test = base.extend<{{exportName}}Fixtures>({
+  {{exportName}}: async ({ page }: { page: Page }, use) => {
+    const {{exportName}}: {{exportName}} = {
+      execute: async () => {
+        {{{content}}}
+      },
+    };
+
+    await use({{exportName}});
+  },
+});
 {{else}}
-/**
- * {{name}} logic 
- * @returns {Function} The fixture function
- */
-exports.{{exportName}} = async function({{params}}) {
-  {{content}}
+// Declare the types of fixtures
+type {{exportName}}Fixtures = {
+  {{exportName}}: Page;
 };
-{{/if}} 
+
+// Extend base test by providing "{{exportName}}"
+export const test = base.extend<{{exportName}}Fixtures>({
+  {{exportName}}: async ({ page }: { page: Page }, use) => {
+    // Initialize the fixture
+    const {{exportName}}Page = page;
+    
+    // Setup code before using the fixture
+    async function setup(): Promise<void> {
+      {{{content}}}
+    }
+    
+    await setup();
+    
+    // Use the fixture value in the test
+    await use({{exportName}}Page);
+  },
+});
+{{/if}}
+
+export { expect } from '@playwright/test'; 

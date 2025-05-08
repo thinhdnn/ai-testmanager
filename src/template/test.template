@@ -1,40 +1,60 @@
-// @ts-check
-const { test, expect } = require('@playwright/test');
+import { test as base, expect } from '@playwright/test';
+
+{{!-- Import all fixtures --}}
 {{#if fixtures}}
-// Fixtures
 {{#each fixtures}}
-const { {{name}} } = require('{{path}}');
+import { {{name}} } from '{{path}}';
 {{/each}}
 {{/if}}
 
-test.describe('{{testCaseName}}', () => {
-  {{#if setup}}
-  test.beforeEach(async ({ page }) => {
-    {{#each setup}}
-    // {{comment}}
-    {{{playwrightCode}}}
-    {{/each}}
-  });
+{{!-- Extend fixtures if any use mode = "extend" --}}
+{{#if fixtures}}
+{{#if (any fixtures "mode" "extend")}}
+const test = base.extend({
+  {{#each fixtures}}
+  {{#if (eq mode "extend")}}
+  {{name}}: {{name}},
   {{/if}}
+  {{/each}}
+});
+{{else}}
+const test = base;
+{{/if}}
+{{else}}
+const test = base;
+{{/if}}
 
-  test('{{testCaseName}}', async ({ page }) => {
-    // Test Steps
-    {{#each steps}}
-    // Step {{order}}: {{action}}
-    {{{playwrightCode}}}
-    {{#if expected}}
-    // Expect: {{expected}}
-    {{/if}}
-    
-    {{/each}}
-  });
+{{!-- Main Test Definition --}}
+{{#if tags}}
+test('{{testCaseName}}', {
+  tag: [{{#each tags}}'@{{this}}'{{#unless @last}}, {{/unless}}{{/each}}],
+}, async ({{#if (any fixtures "mode" "extend")}}{ page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }{{else}}{ page }{{/if}}) => {
+{{else}}
+test('{{testCaseName}}', async ({{#if (any fixtures "mode" "extend")}}{ page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }{{else}}{ page }{{/if}}) => {
+{{/if}}
 
-  {{#if teardown}}
-  test.afterEach(async ({ page }) => {
-    {{#each teardown}}
-    // {{comment}}
-    {{{playwrightCode}}}
-    {{/each}}
-  });
+  // Inline Fixtures
+  {{#each fixtures}}
+  {{#if (eq mode "inline")}}
+  await {{name}}(page);
   {{/if}}
-}); 
+  {{/each}}
+
+  // Test Steps
+  {{#each steps}}
+  // Step {{order}}: {{action}}
+  {{#if disabled}}
+  /* DISABLED STEP
+  {{{playwrightCode}}}
+  {{#if expected}}
+  // Expected: {{expected}}
+  {{/if}}
+  */
+  {{else}}
+  {{{playwrightCode}}}
+  {{#if expected}}
+  // Expected: {{expected}}
+  {{/if}}
+  {{/if}}
+  {{/each}}
+});

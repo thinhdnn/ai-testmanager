@@ -187,11 +187,12 @@ AI Integration:
   - [x] Build result parsing and formatting
   - [x] Add step validation and refinement
 Playwright Integration:
-[ ] Task 1: Create Playwright service for test file generation
-  - [ ] Build template-based code generation
-  - [ ] Implement test step to Playwright code conversion
-  - [ ] Create fixture inclusion mechanism
-  - [ ] Add test file saving and management
+[x] Task 1: Create Playwright service lib
+  - [x] Function create playright project by command: npx create-playwright@latest --install-deps --quiet
+  - [x] Build template-based code for test case content file use src/template/test.template
+  - [x] Build template-based code for fixture content file src/template/fixture.template
+  - [x] Function to use the above templates to create test case file and fixture file
+  - [x] Add test file saving and management
 [ ] Task 2: Implement test execution functionality
   - [ ] Build test runner service
   - [ ] Create browser selection interface
@@ -202,6 +203,8 @@ Playwright Integration:
   - [ ] Implement result capture and storage
   - [ ] Build result visualization interface
   - [ ] Add error reporting and debugging tools
+[ ] Task 4: Build playwright configuartion
+  - [ ] Implement a way to update playwright configuartion to playwright project
 User Management CRUD with Nextjs API:
 [x] Task 1: Create user listing with table view
   - [x] Build user table with pagination

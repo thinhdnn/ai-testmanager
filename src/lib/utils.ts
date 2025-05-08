@@ -67,3 +67,16 @@ export function parseTags(tags: string | null | undefined): string[] {
   
   return tags.split(",").map(tag => tag.trim()).filter(Boolean)
 } 
+
+/**
+ * Sanitizes a string to create a valid folder name
+ * Removes special characters and replaces spaces with hyphens
+ */
+export function sanitizeFolderName(name: string): string {
+  // Replace spaces and special characters with hyphens, remove invalid chars
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-') // Collapse multiple hyphens
+    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+} 
