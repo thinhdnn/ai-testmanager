@@ -8,6 +8,7 @@ export interface TestCase {
   updatedAt: string | Date;
   lastRun: string | Date | null;
   createdAt: string | Date;
+  projectId: string;
   Steps?: Array<{
     id: string;
     order: number;
@@ -33,6 +34,10 @@ export interface Project {
   playwrightProjectPath: string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  lastRunBy?: string | null;
+  lastRun?: Date | null;
 }
 
 export interface TestResult {
@@ -48,4 +53,25 @@ export interface TestResult {
   createdAt: string | Date;
   browser: string | null;
   videoUrl: string | null;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  url: string;
+  description?: string;
+  environment?: string;
+}
+
+export interface CreateProjectResponse {
+  project: Project;
+}
+
+export interface ProjectListResponse {
+  projects: Project[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 } 

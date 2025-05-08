@@ -1,0 +1,14 @@
+{
+  "name": "opm-ml-702a2f03-ebac-41a5-92a9-86ebd7ba3099",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^22.15.17"
+  }
+}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendChart } from '@/components/dashboard/TrendChart';
 import { TagHeatmap } from '@/components/dashboard/TagHeatmap';
-import { DashboardService, DashboardStats } from '@/lib/dashboard/dashboard-service';
+import type { DashboardStats } from '@/lib/dashboard/dashboard-service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, CheckCircle2, Layers3, PlaySquare } from 'lucide-react';
 
@@ -22,7 +22,11 @@ export default function DashboardPage() {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
-        const dashboardStats = await DashboardService.getDashboardStats();
+        const response = await fetch('/api/dashboard');
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard data');
+        }
+        const dashboardStats = await response.json();
         setStats(dashboardStats);
       } catch (error) {
         console.error("Error loading dashboard data:", error);

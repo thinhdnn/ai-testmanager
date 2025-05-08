@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ProjectRepository } from '@/lib/db/repositories/project-repository';
 import { getCurrentUserEmail } from '@/lib/auth/session';
+import { TestManagerService } from '@/lib/test-manager.service';
+import { CreateProjectRequest, ProjectListResponse } from '@/types';
 
 // GET /api/projects
 export async function GET(request: NextRequest) {
@@ -55,15 +57,15 @@ export async function GET(request: NextRequest) {
     const totalPages = Math.ceil(total / take);
     const currentPage = Math.floor(skip / take) + 1;
     
-    return NextResponse.json({ 
-      projects, 
+    return NextResponse.json({
+      projects,
       pagination: {
         total,
         page: currentPage,
         limit: take,
         totalPages
-      } 
-    });
+      }
+    } as ProjectListResponse);
   } catch (error) {
     console.error('Error fetching projects:', error);
     return NextResponse.json(
@@ -77,7 +79,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const userEmail = await getCurrentUserEmail();
-    const data = await request.json();
+    const data = await request.json() as CreateProjectRequest;
     
     // Validate required fields
     if (!data.name) {
@@ -95,22 +97,72 @@ export async function POST(request: NextRequest) {
     }
 
     const projectRepository = new ProjectRepository();
-    const project = await projectRepository.create({
-      name: data.name,
-      url: data.url,
-      description: data.description || '',
-      environment: data.environment || 'development',
-      playwrightProjectPath: data.playwrightProjectPath || null,
-      createdBy: userEmail,
-      updatedBy: userEmail,
-    });
 
-    return NextResponse.json(project, { status: 201 });
+    try {
+      // Check for existing project with same name
+      console.log('Checking for duplicate project name:', data.name);
+      const existingProject = await projectRepository.findByName(data.name);
+      
+      if (existingProject) {
+        console.log('Found existing project:', existingProject);
+        return NextResponse.json(
+          { error: 'A project with this name already exists' },
+          { status: 409 }
+        );
+      }
+
+      console.log('No duplicate found, proceeding with creation');
+      const testManager = new TestManagerService(process.cwd());
+
+      // First create the project in database without Playwright path
+      const project = await projectRepository.create({
+        name: data.name,
+        url: data.url,
+        description: data.description || '',
+        environment: data.environment || 'development',
+        playwrightProjectPath: null, // Initially null
+        createdBy: userEmail,
+        updatedBy: userEmail,
+      });
+
+      console.log('Project created in database:', project);
+
+      try {
+        // Then initialize Playwright project
+        await testManager.initializePlaywrightProject(project.id);
+        console.log('Playwright project initialized');
+
+        // Get the updated project with Playwright path
+        const updatedProject = await projectRepository.findById(project.id);
+        return NextResponse.json(updatedProject, { status: 201 });
+
+      } catch (error) {
+        // If Playwright initialization fails, delete the project from database
+        console.error('Error initializing Playwright project:', error);
+        try {
+          await projectRepository.delete(project.id);
+          console.log('Cleaned up project after Playwright init failure');
+        } catch (deleteError) {
+          console.error('Error cleaning up project:', deleteError);
+        }
+        return NextResponse.json(
+          { error: 'Failed to initialize Playwright project' },
+          { status: 500 }
+        );
+      }
+
+    } catch (error) {
+      console.error('Error in project creation process:', error);
+      return NextResponse.json(
+        { error: 'Failed to create project' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Error creating project:', error);
+    console.error('Error parsing request:', error);
     return NextResponse.json(
-      { error: 'Failed to create project' },
-      { status: 500 }
+      { error: 'Invalid request data' },
+      { status: 400 }
     );
   }
 } 

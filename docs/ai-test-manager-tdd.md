@@ -173,3 +173,28 @@ Build a web-based platform for managing manual and automated test cases. The sys
 - AI-powered test case creation and auto-complete for steps.
 - Full versioning of test cases, steps, and fixtures.
 - Generate & run real Playwright test files from the interface.
+
+
+defaultValues: {
+      // Basic Configuration
+      timeout: 30000,
+      expectTimeout: 5000,
+      retries: 2,
+      workers: "50%",
+      fullyParallel: true,
+      
+      // Browser/Device configuration
+      use: {
+        baseURL: "",
+        headless: true,
+        viewport: {
+          width: 1280,
+          height: 720,
+        },
+        locale: "en-US",
+        timezoneId: "UTC",
+        video: "retain-on-failure",
+        screenshot: "only-on-failure",
+        trace: "retain-on-failure",
+      },
+    },

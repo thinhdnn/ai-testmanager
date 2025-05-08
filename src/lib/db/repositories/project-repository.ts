@@ -1,11 +1,11 @@
-import { prisma } from '@/lib/db/prisma';
+import { prisma } from '../prisma';
 
 type ProjectCreateInput = {
   name: string;
   url: string;
   description?: string;
   environment?: string;
-  playwrightProjectPath?: string;
+  playwrightProjectPath?: string | null;
   createdBy?: string | null;
   updatedBy?: string | null;
 };
@@ -41,9 +41,7 @@ export class ProjectRepository {
    * Create a new project
    */
   async create(data: ProjectCreateInput) {
-    return prisma.project.create({
-      data,
-    });
+    return prisma.project.create({ data });
   }
 
   /**
@@ -130,7 +128,7 @@ export class ProjectRepository {
   /**
    * Update a project
    */
-  async update(id: string, data: ProjectUpdateInput) {
+  async update(id: string, data: Partial<ProjectCreateInput>) {
     return prisma.project.update({
       where: { id },
       data,
@@ -141,17 +139,24 @@ export class ProjectRepository {
    * Delete a project
    */
   async delete(id: string) {
-    return prisma.project.delete({
-      where: { id },
-    });
+    return prisma.project.delete({ where: { id } });
   }
 
   /**
    * Count projects based on criteria
    */
   async count(where?: any) {
-    return prisma.project.count({
-      where,
+    return prisma.project.count({ where });
+  }
+
+  async findByName(name: string) {
+    console.log('Checking for existing project with name:', name);
+    const project = await prisma.project.findFirst({
+      where: {
+        name: name
+      }
     });
+    console.log('Found project:', project);
+    return project;
   }
 } 
