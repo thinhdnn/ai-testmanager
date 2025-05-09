@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ProjectRepository } from '@/lib/db/repositories/project-repository';
 import { getCurrentUserEmail } from '@/lib/auth/session';
-import { TestManagerService } from '@/lib/test-manager.service';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
 import { CreateProjectRequest, ProjectListResponse } from '@/types';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/projects
 export async function GET(request: NextRequest) {
@@ -78,91 +79,113 @@ export async function GET(request: NextRequest) {
 // POST /api/projects
 export async function POST(request: NextRequest) {
   try {
+    const data = await request.json();
     const userEmail = await getCurrentUserEmail();
-    const data = await request.json() as CreateProjectRequest;
-    
-    // Validate required fields
-    if (!data.name) {
-      return NextResponse.json(
-        { error: 'Project name is required' },
-        { status: 400 }
-      );
-    }
 
-    if (!data.url) {
+    // Validate required fields
+    if (!data.name || !data.baseURL) {
       return NextResponse.json(
-        { error: 'Project URL is required' },
+        { error: 'Name and Base URL are required' },
         { status: 400 }
       );
     }
 
     const projectRepository = new ProjectRepository();
 
-    try {
-      // Check for existing project with same name
-      console.log('Checking for duplicate project name:', data.name);
-      const existingProject = await projectRepository.findByName(data.name);
-      
-      if (existingProject) {
-        console.log('Found existing project:', existingProject);
-        return NextResponse.json(
-          { error: 'A project with this name already exists' },
-          { status: 409 }
-        );
-      }
+    // Check for existing project with same name
+    console.log('Checking for duplicate project name:', data.name);
+    const existingProject = await projectRepository.findByName(data.name);
+    
+    if (existingProject) {
+      console.log('Found existing project:', existingProject);
+      return NextResponse.json(
+        { error: 'A project with this name already exists' },
+        { status: 409 }
+      );
+    }
 
-      console.log('No duplicate found, proceeding with creation');
-      const testManager = new TestManagerService(process.cwd());
+    console.log('No duplicate found, proceeding with creation');
+    const testManager = new TestManagerService(process.cwd());
 
-      // First create the project in database without Playwright path
-      const project = await projectRepository.create({
-        name: data.name,
-        url: data.url,
-        description: data.description || '',
-        environment: data.environment || 'development',
-        playwrightProjectPath: null, // Initially null
-        createdBy: userEmail,
-        updatedBy: userEmail,
+    // Create project with transaction to include default settings
+    const project = await prisma.$transaction(async (tx) => {
+      // Create the project
+      const newProject = await tx.project.create({
+        data: {
+          name: data.name,
+          description: data.description,
+          environment: data.environment || 'development',
+          playwrightProjectPath: null,
+          createdBy: userEmail,
+          updatedBy: userEmail,
+        },
       });
 
-      console.log('Project created in database:', project);
+      // Create default configuration settings
+      const defaultSettings = [
+        // Playwright settings
+        { category: 'playwright', key: 'timeout', value: '30000' },
+        { category: 'playwright', key: 'expectTimeout', value: '5000' },
+        { category: 'playwright', key: 'retries', value: '2' },
+        { category: 'playwright', key: 'workers', value: '1' },
+        { category: 'playwright', key: 'fullyParallel', value: 'false' },
+        
+        // Browser settings
+        { category: 'browser', key: 'baseURL', value: data.baseURL },
+        { category: 'browser', key: 'headless', value: 'true' },
+        { category: 'browser', key: 'viewport.width', value: '1920' },
+        { category: 'browser', key: 'viewport.height', value: '1080' },
+        { category: 'browser', key: 'locale', value: 'en-US' },
+        { category: 'browser', key: 'timezoneId', value: 'UTC' },
+        { category: 'browser', key: 'video', value: 'retain-on-failure' },
+        { category: 'browser', key: 'screenshot', value: 'only-on-failure' },
+        { category: 'browser', key: 'trace', value: 'retain-on-failure' },
+      ];
 
-      try {
-        // Then initialize Playwright project
-        await testManager.initializePlaywrightProject(project.id);
-        console.log('Playwright project initialized');
+      // Create all settings
+      await tx.projectSetting.createMany({
+        data: defaultSettings.map(setting => ({
+          projectId: newProject.id,
+          category: setting.category,
+          key: setting.key,
+          value: setting.value,
+          createdBy: userEmail,
+          updatedBy: userEmail,
+        })),
+      });
 
-        // Get the updated project with Playwright path
-        const updatedProject = await projectRepository.findById(project.id);
-        return NextResponse.json(updatedProject, { status: 201 });
+      return newProject;
+    });
 
-      } catch (error) {
-        // If Playwright initialization fails, delete the project from database
-        console.error('Error initializing Playwright project:', error);
-        try {
-          await projectRepository.delete(project.id);
-          console.log('Cleaned up project after Playwright init failure');
-        } catch (deleteError) {
-          console.error('Error cleaning up project:', deleteError);
-        }
-        return NextResponse.json(
-          { error: 'Failed to initialize Playwright project' },
-          { status: 500 }
-        );
-      }
+    try {
+      // Initialize Playwright project
+      await testManager.initializePlaywrightProject(project.id);
+      console.log('Playwright project initialized');
+
+      // Get the updated project with Playwright path
+      const updatedProject = await projectRepository.findById(project.id);
+      return NextResponse.json(updatedProject, { status: 201 });
 
     } catch (error) {
-      console.error('Error in project creation process:', error);
+      // If Playwright initialization fails, delete the project and its settings
+      console.error('Error initializing Playwright project:', error);
+      try {
+        await projectRepository.delete(project.id);
+        console.log('Cleaned up project after Playwright init failure');
+      } catch (deleteError) {
+        console.error('Error cleaning up project:', deleteError);
+      }
       return NextResponse.json(
-        { error: 'Failed to create project' },
+        { error: 'Failed to initialize Playwright project' },
         { status: 500 }
       );
     }
+
   } catch (error) {
-    console.error('Error parsing request:', error);
+    console.error('Error creating project:', error);
     return NextResponse.json(
-      { error: 'Invalid request data' },
-      { status: 400 }
+      { error: 'Failed to create project' },
+      { status: 500 }
     );
   }
 } 

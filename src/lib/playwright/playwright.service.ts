@@ -36,9 +36,17 @@ export class PlaywrightService {
       await fs.mkdir(projectPath, { recursive: true });
 
       // Initialize Playwright project
-      await execAsync('npx create-playwright@latest --install-deps --quiet', {
+      await execAsync('npx create-playwright@latest --quiet --install-deps', {
         cwd: projectPath,
       });
+
+      // Remove default test folders
+      await fs.rm(path.join(projectPath, 'tests'), { recursive: true, force: true });
+      await fs.rm(path.join(projectPath, 'tests-examples'), { recursive: true, force: true });
+
+      // Create new folders
+      await fs.mkdir(path.join(projectPath, 'fixtures'), { recursive: true });
+      await fs.mkdir(path.join(projectPath, 'tests'), { recursive: true });
 
       return projectPath;
     } catch (error: any) {

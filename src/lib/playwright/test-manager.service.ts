@@ -105,7 +105,7 @@ export class TestManagerService {
       .map(step => step.fixture)
       .filter((fixture): fixture is Fixture => fixture !== null);
 
-    return [...new Map(fixtures.map(f => [f.id, f])).values()];
+    return Array.from(new Map(fixtures.map(f => [f.id, f])).values());
   }
 
   private generateFixtureContent(fixture: Fixture & { steps: Step[] }): string {

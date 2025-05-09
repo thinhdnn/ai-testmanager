@@ -180,7 +180,7 @@ defaultValues: {
       timeout: 30000,
       expectTimeout: 5000,
       retries: 2,
-      workers: "50%",
+      workers: 1,
       fullyParallel: true,
       
       // Browser/Device configuration

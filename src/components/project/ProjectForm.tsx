@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -28,7 +28,7 @@ import {
 // Validation schema for project form
 const projectFormSchema = z.object({
   name: z.string().min(3, { message: 'Project name must be at least 3 characters' }),
-  url: z.string().url({ message: 'Must be a valid URL' }),
+  baseURL: z.string().url({ message: 'Must be a valid URL' }),
   description: z.string().optional(),
   environment: z.enum(['development', 'staging', 'production', 'testing']),
 });
@@ -38,7 +38,7 @@ type ProjectFormValues = z.infer<typeof projectFormSchema>;
 // Default values for new project
 const defaultValues: Partial<ProjectFormValues> = {
   name: '',
-  url: '',
+  baseURL: '',
   description: '',
   environment: 'development',
 };
@@ -47,7 +47,6 @@ interface ProjectFormProps {
   project?: {
     id?: string;
     name: string;
-    url: string;
     description?: string | null;
     environment: string;
   };
@@ -64,12 +63,28 @@ export function ProjectForm({ project, mode }: ProjectFormProps) {
     defaultValues: project 
       ? {
           name: project.name,
-          url: project.url,
+          baseURL: '', // Will be loaded from settings
           description: project.description || '',
           environment: project.environment as any,
         }
       : defaultValues,
   });
+
+  // Load baseURL from project settings if in edit mode
+  useEffect(() => {
+    if (mode === 'edit' && project?.id) {
+      fetch(`/api/projects/${project.id}/configuration`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.browser?.baseURL) {
+            form.setValue('baseURL', data.browser.baseURL);
+          }
+        })
+        .catch(error => {
+          console.error('Error loading project configuration:', error);
+        });
+    }
+  }, [project?.id, mode, form]);
 
   // Form submission handler
   async function onSubmit(values: ProjectFormValues) {
@@ -135,10 +150,10 @@ export function ProjectForm({ project, mode }: ProjectFormProps) {
 
         <FormField
           control={form.control}
-          name="url"
+          name="baseURL"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Project URL</FormLabel>
+              <FormLabel>Base URL</FormLabel>
               <FormControl>
                 <Input 
                   placeholder="https://example.com" 

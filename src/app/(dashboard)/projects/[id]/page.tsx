@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { TestCaseTable } from '@/components/test-case/test-case-table';
 import { FixtureTable } from '@/components/fixture/fixture-table';
 import { formatDate } from '@/lib/utils/date';
+import { ProjectConfigForm } from '@/components/project/project-config-form';
 
 interface Project {
   id: string;
@@ -208,6 +209,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="test-cases">Test Cases ({project.testCases?.length || 0})</TabsTrigger>
           <TabsTrigger value="fixtures">Fixtures ({project.fixtures?.length || 0})</TabsTrigger>
           <TabsTrigger value="results">Results ({project.testResults?.length || 0})</TabsTrigger>
+          <TabsTrigger value="configuration">Configuration</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-6">
@@ -407,6 +409,12 @@ export default function ProjectDetailPage() {
                 ))}
               </div>
             )}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="configuration">
+          <div className="bg-card rounded-lg border shadow-sm">
+            <ProjectConfigForm projectId={project.id} />
           </div>
         </TabsContent>
       </Tabs>

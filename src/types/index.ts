@@ -28,16 +28,15 @@ export interface TestCase {
 export interface Project {
   id: string;
   name: string;
-  url: string;
   description: string | null;
   environment: string;
   playwrightProjectPath: string | null;
-  createdAt: string | Date;
-  updatedAt: string | Date;
-  createdBy?: string | null;
-  updatedBy?: string | null;
-  lastRunBy?: string | null;
-  lastRun?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+  lastRunBy: string | null;
+  lastRun: Date | null;
 }
 
 export interface TestResult {
@@ -57,7 +56,7 @@ export interface TestResult {
 
 export interface CreateProjectRequest {
   name: string;
-  url: string;
+  baseURL: string;
   description?: string;
   environment?: string;
 }

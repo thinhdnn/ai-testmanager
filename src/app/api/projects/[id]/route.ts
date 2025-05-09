@@ -9,10 +9,10 @@ const projectRepository = new ProjectRepository();
 // Get a single project by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { id: projectId } = params;
+    const { id: projectId } = await context.params;
     
     // Temporarily disable permission check to fix the 403 error
     const hasPermission = await checkPermission('project', 'view');
@@ -47,10 +47,10 @@ export async function GET(
 // Update a project
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const projectId = params.id;
+    const { id: projectId } = await context.params;
     const userEmail = await getCurrentUserEmail();
     
     // Check permission
@@ -96,10 +96,10 @@ export async function PUT(
 // Delete a project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const projectId = params.id;
+    const { id: projectId } = await context.params;
     
     // Check permission
     const hasPermission = await checkResourcePermission('project', 'delete', projectId);
