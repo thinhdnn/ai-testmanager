@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,10 +13,27 @@ import Link from "next/link";
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Get the callbackUrl from query parameters with validation
+  const rawCallbackUrl = searchParams?.get("callbackUrl");
+  
+  // Validate and normalize the callback URL to prevent recursive redirects
+  const callbackUrl = useSafeCallbackUrl(rawCallbackUrl);
+
+  // Check for error in URL (e.g., when redirected from NextAuth)
+  useEffect(() => {
+    const errorParam = searchParams?.get("error");
+    if (errorParam === "CredentialsSignin") {
+      setError("Invalid username or password");
+    } else if (errorParam) {
+      setError("An error occurred during sign in");
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +45,7 @@ export default function SignInPage() {
         username,
         password,
         redirect: false,
-        callbackUrl: "/dashboard",
+        callbackUrl,
       });
 
       if (result?.error) {
@@ -37,8 +54,8 @@ export default function SignInPage() {
         return;
       }
 
-      // Redirect to dashboard on success
-      router.push("/dashboard");
+      // Redirect to the callback URL or dashboard on success
+      router.push(result?.url || callbackUrl);
       router.refresh();
     } catch (error) {
       setError("An error occurred during sign in");
@@ -157,4 +174,44 @@ export default function SignInPage() {
       </footer>
     </div>
   );
+}
+
+// Helper function to validate and process the callback URL
+function useSafeCallbackUrl(callbackUrl: string | null): string {
+  const defaultUrl = "/dashboard";
+  
+  if (!callbackUrl) {
+    return defaultUrl;
+  }
+  
+  try {
+    // First decode the URL to check if it's valid
+    const decodedUrl = decodeURIComponent(callbackUrl);
+    
+    // Check if it's an auth/signin recursive URL
+    if (decodedUrl.includes('/auth/signin?callbackUrl=')) {
+      // It's a recursive URL, extract the innermost callback
+      const match = decodedUrl.match(/\/auth\/signin\?callbackUrl=([^&]+)/);
+      if (match && match[1]) {
+        // Try to decode one more level
+        try {
+          const innerCallback = decodeURIComponent(match[1]);
+          // If the inner callback is also a signin URL, just use the default
+          if (innerCallback.includes('/auth/signin')) {
+            return defaultUrl;
+          }
+          return innerCallback;
+        } catch {
+          return defaultUrl;
+        }
+      }
+      return defaultUrl;
+    }
+    
+    // Not a recursive URL, use as is
+    return decodedUrl;
+  } catch {
+    // If decoding fails, return the default URL
+    return defaultUrl;
+  }
 } 

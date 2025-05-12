@@ -8,7 +8,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const projectId = params.id;
+    const paramsCopy = await Promise.resolve(params);
+    const projectId = paramsCopy.id;
     const tagRepository = new TagRepository();
     
     // First try to get tags from the Tag model for this project
@@ -80,7 +81,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const projectId = params.id;
+    const paramsCopy = await Promise.resolve(params);
+    const projectId = paramsCopy.id;
     const tagRepository = new TagRepository();
     const data = await request.json();
     

@@ -26,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { UserService } from "@/lib/api/services";
 
 interface Role {
   id: string;
@@ -59,6 +60,7 @@ export default function CreateUserPage() {
   const router = useRouter();
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const userService = new UserService();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema) as any,
@@ -75,11 +77,7 @@ export default function CreateUserPage() {
   useEffect(() => {
     async function fetchRoles() {
       try {
-        const response = await fetch("/api/roles");
-        if (!response.ok) {
-          throw new Error("Failed to fetch roles");
-        }
-        const data = await response.json();
+        const data = await userService.getRoles();
         setRoles(data.roles);
       } catch (error) {
         console.error("Error fetching roles:", error);
@@ -93,24 +91,13 @@ export default function CreateUserPage() {
   const onSubmit: SubmitHandler<FormData> = async (values) => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: values.username,
-          email: values.email || null,
-          password: values.password,
-          roleIds: values.roleIds,
-          isActive: values.isActive,
-        }),
+      await userService.createUser({
+        username: values.username,
+        email: values.email || null,
+        password: values.password,
+        roleIds: values.roleIds,
+        isActive: values.isActive,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create user");
-      }
 
       toast.success("User created successfully");
       router.push("/users");

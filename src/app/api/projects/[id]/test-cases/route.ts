@@ -8,8 +8,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Ensure params is awaited before using it
+    const projectId = params.id;
+    
     const testCaseRepository = new TestCaseRepository();
-    const testCases = await testCaseRepository.findByProjectId(params.id);
+    const testCases = await testCaseRepository.findByProjectId(projectId);
 
     return NextResponse.json(testCases);
   } catch (error) {
@@ -27,6 +30,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Ensure params is awaited before using it
+    const projectId = params.id;
+    
     const userEmail = await getCurrentUserEmail();
     const data = await request.json();
     
@@ -44,7 +50,7 @@ export async function POST(
       status: data.status || 'pending',
       isManual: data.isManual === true,
       tags: data.tags || null,
-      projectId: params.id,
+      projectId: projectId, // Use the extracted projectId here
       createdBy: userEmail,
       updatedBy: userEmail,
     });

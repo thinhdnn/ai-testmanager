@@ -1,42 +1,21 @@
-export interface TestCase {
-  id: string;
+// Export all interfaces from specialized files
+export * from './project';
+export * from './test-case';
+export * from './stats';
+
+// Import types for reference
+import { Project } from './project';
+
+// Keep interfaces that aren't in other files yet
+export interface CreateProjectRequest {
   name: string;
-  status: string;
-  version: string;
-  isManual: boolean;
-  tags: string | null;
-  updatedAt: string | Date;
-  lastRun: string | Date | null;
-  createdAt: string | Date;
-  projectId: string;
-  Steps?: Array<{
-    id: string;
-    order: number;
-    action: string;
-    expected: string | null;
-    data: string | null;
-    disabled: boolean;
-    createdAt: string | Date;
-    updatedAt: string | Date;
-    testCaseId: string;
-  }>;
-  _count?: {
-    Steps: number;
-  };
+  baseURL: string;
+  description?: string;
+  environment?: string;
 }
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string | null;
-  environment: string;
-  playwrightProjectPath: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
-  lastRunBy: string | null;
-  lastRun: Date | null;
+export interface CreateProjectResponse {
+  project: Project;
 }
 
 export interface TestResult {
@@ -52,25 +31,4 @@ export interface TestResult {
   createdAt: string | Date;
   browser: string | null;
   videoUrl: string | null;
-}
-
-export interface CreateProjectRequest {
-  name: string;
-  baseURL: string;
-  description?: string;
-  environment?: string;
-}
-
-export interface CreateProjectResponse {
-  project: Project;
-}
-
-export interface ProjectListResponse {
-  projects: Project[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
 } 

@@ -43,7 +43,7 @@ export const TestTemplateSchema = z.object({
  */
 export const FixtureTemplateSchema = z.object({
   name: z.string().min(1, "Fixture name is required"),
-  type: z.enum(['data', 'logic']),
+  type: z.enum(['extend', 'inline']),
   description: z.string().optional(),
   exportName: z.string().min(1, "Export name is required"),
   content: z.string(),

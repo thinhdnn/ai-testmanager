@@ -19,7 +19,8 @@ export async function GET(
       );
     }
 
-    const userId = params.userId;
+    // According to Next.js 15 docs, params must be awaited before using its properties
+    const { userId } = await params;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -69,7 +70,8 @@ export async function PUT(
       );
     }
 
-    const userId = params.userId;
+    // According to Next.js 15 docs, params must be awaited before using its properties
+    const { userId } = await params;
     const data = await req.json();
 
     // Check if the user exists
@@ -129,7 +131,8 @@ export async function DELETE(
       );
     }
 
-    const userId = params.userId;
+    // According to Next.js 15 docs, params must be awaited before using its properties
+    const { userId } = await params;
 
     // Check if the user exists
     const existingUser = await prisma.user.findUnique({

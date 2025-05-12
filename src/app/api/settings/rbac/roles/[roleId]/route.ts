@@ -8,7 +8,8 @@ export async function GET(
   { params }: { params: { roleId: string } }
 ) {
   try {
-    const roleId = params.roleId;
+    // According to Next.js 15 docs, params must be awaited before using its properties
+    const { roleId } = await params;
 
     const role = await prisma.role.findUnique({
       where: { id: roleId },
@@ -69,7 +70,8 @@ export async function PUT(
       );
     }
 
-    const roleId = params.roleId;
+    // According to Next.js 15 docs, params must be awaited before using its properties
+    const { roleId } = await params;
     const { name, permissionIds } = await request.json();
 
     // Check if role exists
@@ -184,7 +186,8 @@ export async function DELETE(
       );
     }
 
-    const roleId = params.roleId;
+    // According to Next.js 15 docs, params must be awaited before using its properties
+    const { roleId } = await params;
 
     // Check if role exists
     const role = await prisma.role.findUnique({

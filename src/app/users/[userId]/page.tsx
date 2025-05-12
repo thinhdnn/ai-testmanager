@@ -24,6 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CheckCircle, XCircle, Edit, Trash2 } from "lucide-react";
+import { UserService } from "@/lib/api/services";
 
 interface User {
   id: string;
@@ -48,27 +49,23 @@ export default function UserDetailPage({ params }: { params: { userId: string } 
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const userService = new UserService();
 
   useEffect(() => {
     async function fetchUser() {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/users/${params.userId}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            toast.error("User not found");
-            router.push("/users");
-            return;
-          }
-          throw new Error("Failed to fetch user");
-        }
-        
-        const userData = await response.json();
+        const userData = await userService.getUser(params.userId);
         setUser(userData);
       } catch (error) {
         console.error("Error fetching user:", error);
         toast.error("Failed to load user information");
+        
+        // Redirect to users page if user not found (404 error)
+        if (error instanceof Error && error.message.includes("404")) {
+          toast.error("User not found");
+          router.push("/users");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -81,21 +78,11 @@ export default function UserDetailPage({ params }: { params: { userId: string } 
     if (!user) return;
     
     try {
-      const response = await fetch(`/api/users/${user.id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ isActive: !user.isActive }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update user status");
-      }
-
+      const updatedUser = await userService.updateUserStatus(user.id, !user.isActive);
+      
       setUser({
         ...user,
-        isActive: !user.isActive,
+        isActive: updatedUser.isActive,
       });
       
       toast.success(`User ${user.isActive ? "disabled" : "enabled"} successfully`);
@@ -110,14 +97,8 @@ export default function UserDetailPage({ params }: { params: { userId: string } 
     
     try {
       setIsDeleting(true);
-      const response = await fetch(`/api/users/${user.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete user");
-      }
-
+      await userService.deleteUser(user.id);
+      
       toast.success("User deleted successfully");
       router.push("/users");
     } catch (error) {

@@ -68,7 +68,9 @@ export async function checkPermission(resource: string, action: string): Promise
 }
 
 /**
- * Resource-specific permission check (e.g., project.update, testcase.delete)
+ * Resource-specific permission check with simplified inheritance model.
+ * All fixture and testcase permissions inherit from project permissions.
+ * This eliminates the need for individual resource-specific permission assignments.
  */
 export async function checkResourcePermission(
   resource: string,
@@ -90,18 +92,55 @@ export async function checkResourcePermission(
       return false;
     }
     
-    // Basic permission check
+    // Basic permission check for the specified resource type
     const hasPermission = await checkPermission(resource, action);
     console.log(`[RBAC] Basic permission check result for ${resource}.${action}: ${hasPermission}`);
     
-    if (!hasPermission) {
-      console.log(`[RBAC] Permission denied: User doesn't have ${resource}.${action} permission`);
-      return false;
+    if (hasPermission) {
+      console.log(`[RBAC] Permission granted: User has ${resource}.${action} permission for ${resourceId}`);
+      return true;
     }
-
-    // For future use: add resource-specific checks here if needed
-    console.log(`[RBAC] Permission granted: User has ${resource}.${action} permission for ${resourceId}`);
-    return true;
+    
+    // If resource is not 'project', check for inherited project permission
+    if (resource !== 'project') {
+      // Get the project ID associated with this resource if it's a child resource
+      let projectId: string | null = null;
+      
+      if (resource === 'testCase') {
+        const testCase = await prisma.testCase.findUnique({
+          where: { id: resourceId },
+          select: { projectId: true }
+        });
+        projectId = testCase?.projectId || null;
+      } else if (resource === 'fixture') {
+        const fixture = await prisma.fixture.findUnique({
+          where: { id: resourceId },
+          select: { projectId: true }
+        });
+        projectId = fixture?.projectId || null;
+      } else if (resource === 'testResult') {
+        const testResult = await prisma.testResultHistory.findUnique({
+          where: { id: resourceId },
+          select: { testCase: { select: { projectId: true } } }
+        });
+        projectId = testResult?.testCase?.projectId || null;
+      }
+      
+      if (projectId) {
+        // For fixtures and test cases, check project permissions instead
+        // This implements the inheritance model where project permissions apply to all sub-resources
+        const projectPermission = await checkPermission('project', action);
+        console.log(`[RBAC] Inherited permission check result for project.${action}: ${projectPermission}`);
+        
+        if (projectPermission) {
+          console.log(`[RBAC] Permission granted via inheritance: User has project.${action} permission`);
+          return true;
+        }
+      }
+    }
+    
+    console.log(`[RBAC] Permission denied: User doesn't have ${resource}.${action} or inherited permission`);
+    return false;
   } catch (error) {
     console.error("[RBAC] Error checking resource permission:", error);
     return false;

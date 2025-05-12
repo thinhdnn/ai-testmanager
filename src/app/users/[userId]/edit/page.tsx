@@ -26,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { UserService } from "@/lib/api/services";
 
 interface Role {
   id: string;
@@ -65,6 +66,7 @@ export default function EditUserPage({ params }: { params: { userId: string } })
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const userService = new UserService();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema) as any,
@@ -80,11 +82,7 @@ export default function EditUserPage({ params }: { params: { userId: string } })
   useEffect(() => {
     async function fetchRoles() {
       try {
-        const response = await fetch("/api/roles");
-        if (!response.ok) {
-          throw new Error("Failed to fetch roles");
-        }
-        const data = await response.json();
+        const data = await userService.getRoles();
         setRoles(data.roles);
       } catch (error) {
         console.error("Error fetching roles:", error);
@@ -95,18 +93,7 @@ export default function EditUserPage({ params }: { params: { userId: string } })
     async function fetchUser() {
       try {
         setIsLoadingUser(true);
-        const response = await fetch(`/api/users/${params.userId}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            toast.error("User not found");
-            router.push("/users");
-            return;
-          }
-          throw new Error("Failed to fetch user");
-        }
-        
-        const userData = await response.json();
+        const userData = await userService.getUser(params.userId);
         setUser(userData);
         
         // Set form values
@@ -120,6 +107,12 @@ export default function EditUserPage({ params }: { params: { userId: string } })
       } catch (error) {
         console.error("Error fetching user:", error);
         toast.error("Failed to load user information");
+        
+        // Redirect to users page if user not found (404 error)
+        if (error instanceof Error && error.message.includes("404")) {
+          toast.error("User not found");
+          router.push("/users");
+        }
       } finally {
         setIsLoadingUser(false);
       }
@@ -144,18 +137,7 @@ export default function EditUserPage({ params }: { params: { userId: string } })
         payload.password = values.password;
       }
       
-      const response = await fetch(`/api/users/${params.userId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update user");
-      }
+      await userService.updateUser(params.userId, payload);
 
       toast.success("User updated successfully");
       router.push("/users");

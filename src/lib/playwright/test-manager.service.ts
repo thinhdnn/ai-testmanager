@@ -82,7 +82,7 @@ export class TestManagerService {
 
     await this.playwrightService.generateFixtureFile({
       name: fixture.name,
-      type: fixture.type as 'data' | 'page',
+      type: fixture.type as 'extend' | 'inline',
       description: fixture.name,
       exportName: fixture.exportName || fixture.name,
       content,

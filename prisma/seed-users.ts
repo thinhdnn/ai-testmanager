@@ -25,13 +25,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Tìm role Tester
-  const testerRole = await prisma.role.findUnique({
-    where: { name: "Tester" },
+  // Tìm role Test Engineer (đã đổi tên từ Tester)
+  const testEngineerRole = await prisma.role.findUnique({
+    where: { name: "Test Engineer" },
   });
 
-  if (!testerRole) {
-    console.error("Tester role not found! Please run seed-roles.ts first.");
+  if (!testEngineerRole) {
+    console.error("Test Engineer role not found! Please run seed-roles.ts first.");
     return;
   }
 
@@ -68,14 +68,14 @@ async function main(): Promise<void> {
   });
   console.log("Created regular user");
 
-  // Gán role Tester cho regular user
+  // Gán role Test Engineer cho regular user
   await prisma.userRole.create({
     data: {
       userId: regularUser.id,
-      roleId: testerRole.id,
+      roleId: testEngineerRole.id,
     },
   });
-  console.log("Assigned Tester role to regular user");
+  console.log("Assigned Test Engineer role to regular user");
 
   console.log("Seeding finished");
 }

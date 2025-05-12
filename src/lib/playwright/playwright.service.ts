@@ -84,7 +84,7 @@ export class PlaywrightService {
 
   async generateFixtureFile(params: {
     name: string;
-    type: 'data' | 'page';
+    type: 'extend' | 'inline';
     description?: string;
     exportName: string;
     content: string;

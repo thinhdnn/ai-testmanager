@@ -19,7 +19,8 @@ export async function PATCH(
       );
     }
 
-    const userId = params.userId;
+    // According to Next.js 15 docs, params must be awaited before using its properties
+    const { userId } = await params;
     const { isActive } = await req.json();
 
     // Check if the user exists

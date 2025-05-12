@@ -28,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, Search, X, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
+import { UserService } from '@/lib/api/services';
 
 interface User {
   id: string;
@@ -53,6 +54,7 @@ export default function UsersPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const userService = new UserService();
 
   useEffect(() => {
     loadUsers();
@@ -62,25 +64,17 @@ export default function UsersPage() {
     try {
       setLoading(true);
       
-      // Build query parameters
-      const params = new URLSearchParams({
-        skip: (page * pageSize).toString(),
-        take: pageSize.toString(),
+      const result = await userService.getUsers({
+        skip: page * pageSize,
+        take: pageSize,
         sortBy: sortField,
         sortDirection: sortDirection,
-        ...(statusFilter && { status: statusFilter }),
-        ...(searchTerm && { search: searchTerm })
+        status: statusFilter || undefined,
+        search: searchTerm || undefined
       });
       
-      const response = await fetch(`/api/users?${params.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error("Failed to load users");
-      }
-      
-      const data = await response.json();
-      setUsers(data.users);
-      setTotal(data.total);
+      setUsers(result.users);
+      setTotal(result.total);
     } catch (error) {
       console.error("Failed to load users:", error);
       toast.error("Failed to load users");
@@ -100,18 +94,8 @@ export default function UsersPage() {
 
   async function handleStatusChange(userId: string, isActive: boolean) {
     try {
-      const response = await fetch(`/api/users/${userId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ isActive }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update user status");
-      }
-
+      await userService.updateUserStatus(userId, isActive);
+      
       setUsers(users.map(user => 
         user.id === userId ? { ...user, isActive } : user
       ));

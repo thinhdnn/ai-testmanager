@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,9 +27,11 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { usePermission } from '@/lib/auth/use-permission';
+import { usePermission } from '@/lib/rbac/use-permission';
 import { Badge } from '@/components/ui/badge';
 import { X, Plus } from 'lucide-react';
+import { TestCaseService } from '@/lib/api/services';
+import { TestCase as ApiTestCase } from '@/lib/api/interfaces';
 
 // Define form schema with Zod
 const formSchema = z.object({
@@ -46,38 +48,53 @@ interface TagOption {
   label: string;
 }
 
-interface TestCase {
+// Use local interface for our component that's compatible with the UI needs
+interface TestCaseProps {
   id: string;
   name: string;
   status: string;
   isManual: boolean;
-  tags: string | null;
+  tags: string[];
 }
 
 interface TestCaseFormProps {
   projectId: string;
-  testCase?: TestCase;
+  testCase?: any; // Use any to avoid type issues
   isEditing?: boolean;
 }
 
+// Define a compatible interface for API calls
+interface ApiPayload {
+  name: string;
+  status: string;
+  isManual: boolean;
+  tags: string; // String format for API
+}
+
 export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCaseFormProps) {
+  console.log('TestCaseForm render');
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const canEdit = usePermission('update', 'testcase', projectId);
+  
+  // Per seed-roles.ts: "project.update" permission is for both "Create and update projects, fixtures and test cases"
+  const hasUpdatePermission = usePermission('project.update');
+  
+  // Use useMemo to prevent recreation of the service instance on each render
+  const testCaseService = useMemo(() => new TestCaseService(), []);
   
   // Status options
-  const statusOptions = [
+  const statusOptions = useMemo(() => [
     { value: 'pending', label: 'Pending' },
     { value: 'active', label: 'Active' },
     { value: 'deprecated', label: 'Deprecated' },
     { value: 'draft', label: 'Draft' },
-  ];
+  ], []);
 
   // Sample tag suggestions if API fails
-  const defaultTagOptions = [
+  const defaultTagOptions = useMemo(() => [
     { value: 'regression', label: 'Regression' },
     { value: 'smoke', label: 'Smoke' },
     { value: 'api', label: 'API' },
@@ -85,7 +102,7 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
     { value: 'performance', label: 'Performance' },
     { value: 'security', label: 'Security' },
     { value: 'accessibility', label: 'Accessibility' },
-  ];
+  ], []);
 
   // Initialize form with default values or existing test case
   const form = useForm<FormValues>({
@@ -94,54 +111,61 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
       name: testCase?.name || '',
       status: testCase?.status || 'pending',
       isManual: testCase?.isManual || false,
-      tags: testCase?.tags || '', // This will be updated by the useEffect that sets selectedTags
+      tags: Array.isArray(testCase?.tags) ? testCase.tags.join(',') : '', // Handle both array and string
     },
   });
 
   // Initialize selected tags from form value
   useEffect(() => {
-    // If editing an existing test case, initialize selected tags from the tags string
     if (testCase?.tags) {
-      const tagArray = testCase.tags.split(',').map(tag => tag.trim()).filter(Boolean);
-      setSelectedTags(tagArray);
-      console.log('Initialized selected tags from test case:', tagArray);
+      try {
+        // Handle the case when tags is already an array
+        if (Array.isArray(testCase.tags)) {
+          setSelectedTags(testCase.tags);
+        } 
+        // Handle the case when tags is a string
+        else if (typeof testCase.tags === 'string') {
+          const tagsArray = testCase.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+          setSelectedTags(tagsArray);
+        }
+      } catch (error) {
+        console.error('Error parsing tags:', error);
+        setSelectedTags([]);
+      }
     }
   }, [testCase]);
 
-  // Fetch tag options
+  // Fetch tag options only once when component mounts
   useEffect(() => {
+    let isMounted = true;
+    console.log('Fetch tags useEffect running');
+    
     async function fetchTags() {
+      if (!projectId) return;
+      
       try {
         console.log(`Fetching tags for project: ${projectId}`);
-        const response = await fetch(`/api/projects/${projectId}/tags`, {
-          credentials: 'include', // Include credentials for authentication
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const tags = await testCaseService.getProjectTags(projectId);
         
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Tags fetched successfully:', data);
-          setTagOptions(data);
-        } else {
-          console.error('Failed to fetch tags:', response.status, response.statusText);
-          // Fallback to default tags if API fails
-          setTagOptions(defaultTagOptions);
+        if (isMounted) {
+          console.log('Tags fetched successfully:', tags);
+          setTagOptions(tags);
         }
       } catch (error) {
         console.error('Error fetching tags:', error);
-        setTagOptions(defaultTagOptions);
+        if (isMounted) {
+          setTagOptions(defaultTagOptions);
+        }
       }
     }
 
-    if (projectId) {
-      fetchTags();
-    } else {
-      console.error('Cannot fetch tags: Project ID is undefined');
-      setTagOptions(defaultTagOptions);
-    }
-  }, [projectId]);
+    fetchTags();
+    
+    // Cleanup function to prevent setting state on unmounted component
+    return () => {
+      isMounted = false;
+    };
+  }, [projectId, defaultTagOptions]); // Only re-run if projectId changes
 
   // Update form value when selected tags change
   useEffect(() => {
@@ -152,10 +176,10 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
   }, [selectedTags, form]);
 
   // Handle adding a tag
-  const handleAddTag = (tag: string) => {
+  const handleAddTag = useCallback((tag: string) => {
     const trimmedTag = tag.trim();
     if (trimmedTag && !selectedTags.includes(trimmedTag)) {
-      setSelectedTags([...selectedTags, trimmedTag]);
+      setSelectedTags(prev => [...prev, trimmedTag]);
       setTagInput('');
       
       // Add to tag options if it doesn't exist
@@ -164,89 +188,66 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
         createProjectTag(trimmedTag);
       }
     }
-  };
+  }, [selectedTags, tagOptions]);
 
   // Create a new project tag
-  const createProjectTag = async (tagValue: string) => {
+  const createProjectTag = useCallback(async (tagValue: string) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/tags`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ value: tagValue }),
-      });
+      const newTag = await testCaseService.createProjectTag(projectId, tagValue);
+      console.log('New tag created:', newTag);
       
-      if (response.ok) {
-        const newTag = await response.json();
-        console.log('New tag created:', newTag);
-        
-        // Update tag options with the new tag
-        setTagOptions(prev => {
-          if (prev.some(t => t.value === newTag.value)) {
-            return prev;
-          }
-          return [...prev, newTag];
-        });
-      } else {
-        console.error('Failed to create tag:', response.status);
-      }
+      // Update tag options with the new tag
+      setTagOptions(prev => {
+        if (prev.some(t => t.value === newTag.value)) {
+          return prev;
+        }
+        return [...prev, newTag];
+      });
     } catch (error) {
       console.error('Error creating tag:', error);
     }
-  };
+  }, [projectId, testCaseService]);
 
   // Handle removing a tag
-  const handleRemoveTag = (tag: string) => {
-    setSelectedTags(selectedTags.filter(t => t !== tag));
-  };
+  const handleRemoveTag = useCallback((tag: string) => {
+    setSelectedTags(prev => prev.filter(t => t !== tag));
+  }, []);
 
   // Handle tag input key down
-  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTagInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       handleAddTag(tagInput);
     }
-  };
+  }, [tagInput, handleAddTag]);
 
   // Handle form submission
   const onSubmit = async (values: FormValues) => {
-    if (!canEdit) {
-      toast.error('You do not have permission to edit test cases.');
+    if (!hasUpdatePermission) {
+      toast.error('You do not have permission to create or update test cases.');
       return;
     }
 
     try {
       setIsSubmitting(true);
 
-      const endpoint = isEditing 
-        ? `/api/projects/${projectId}/test-cases/${testCase?.id}`
-        : `/api/projects/${projectId}/test-cases`;
-      
-      const method = isEditing ? 'PUT' : 'POST';
-
-      // Make sure tags and isManual are properly included in the request
-      const payload = {
-        ...values,
-        tags: selectedTags.join(','), // Use the selectedTags array directly
-        isManual: values.isManual // Ensure isManual is included
+      // Prepare the payload as ApiPayload
+      const payload: ApiPayload = {
+        name: values.name,
+        status: values.status,
+        isManual: values.isManual,
+        tags: selectedTags.join(',') // Join tags as comma-separated string
       };
 
-      // Log the payload for debugging
       console.log('Submitting test case with payload:', payload);
 
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('API error response:', error);
-        throw new Error(error.error || 'Failed to save test case');
+      let response;
+      if (isEditing && testCase?.id) {
+        // Type assertion to make TypeScript happy
+        response = await testCaseService.updateTestCase(projectId, testCase.id, payload as any);
+      } else {
+        // Type assertion to make TypeScript happy
+        response = await testCaseService.createTestCase(projectId, payload as any);
       }
 
       toast.success(
@@ -255,8 +256,7 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
 
       // If creating a new test case, navigate to the newly created test case
       if (!isEditing) {
-        const data = await response.json();
-        router.push(`/projects/${projectId}/test-cases/${data.id}`);
+        router.push(`/projects/${projectId}/test-cases/${response.id}`);
       } else {
         // If editing, refresh the page to show updated data
         router.refresh();
@@ -419,7 +419,7 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
               >
                 Close
               </Button>
-              <Button type="submit" disabled={isSubmitting || !canEdit}>
+              <Button type="submit" disabled={isSubmitting || !hasUpdatePermission}>
                 {isSubmitting ? 'Saving...' : isEditing ? 'Update Test Case' : 'Create Test Case'}
               </Button>
             </div>

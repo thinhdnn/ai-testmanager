@@ -20,9 +20,10 @@ interface Props {
 async function fetchProject(projectId: string): Promise<Project | null> {
   // Use the utility function to get the absolute URL
   const url = getProjectApiUrl(projectId);
+  const headersList = await headers();
   
   const res = await fetch(url, { 
-    headers: headers(),
+    headers: headersList,
     cache: 'no-store' 
   });
   
@@ -35,7 +36,9 @@ async function fetchProject(projectId: string): Promise<Project | null> {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const project = await fetchProject(params.id);
+  const paramsCopy = await Promise.resolve(params);
+  const id = paramsCopy.id;
+  const project = await fetchProject(id);
   
   if (!project) {
     return {
@@ -50,7 +53,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function NewTestCasePage({ params }: Props) {
-  const { id } = params;
+  const paramsCopy = await Promise.resolve(params);
+  const id = paramsCopy.id;
   const project = await fetchProject(id);
   
   if (!project) {
