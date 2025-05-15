@@ -43,8 +43,10 @@ interface Props {
 // Fetch project from API - keeping just for metadata generation
 async function fetchProject(projectId: string): Promise<any> {
   const url = getProjectApiUrl(projectId);
+  const headersList = await headers();
+  
   const res = await fetch(url, {
-    headers: headers(),
+    headers: headersList,
     cache: 'no-store'
   });
   
@@ -57,24 +59,25 @@ async function fetchProject(projectId: string): Promise<any> {
 }
 
 // Fetch test cases from API
-async function fetchTestCases(projectId: string, params: Props['searchParams']): Promise<TestCasesResponse> {
+async function fetchTestCases(projectId: string, searchParamsData: Props['searchParams']): Promise<TestCasesResponse> {
   try {
-    const page = params.page ? parseInt(params.page) : 1;
-    const limit = params.limit ? parseInt(params.limit) : 10;
+    const page = searchParamsData.page ? parseInt(searchParamsData.page) : 1;
+    const limit = searchParamsData.limit ? parseInt(searchParamsData.limit) : 10;
     const searchParams = new URLSearchParams();
     
     searchParams.append('page', page.toString());
     searchParams.append('limit', limit.toString());
     
-    if (params.search) searchParams.append('search', params.search);
-    if (params.status) searchParams.append('status', params.status);
-    if (params.tags) searchParams.append('tags', params.tags);
+    if (searchParamsData.search) searchParams.append('search', searchParamsData.search);
+    if (searchParamsData.status) searchParams.append('status', searchParamsData.status);
+    if (searchParamsData.tags) searchParams.append('tags', searchParamsData.tags);
     
     // Use the getProjectApiUrl function to get an absolute URL
     const url = getProjectApiUrl(projectId, `test-cases?${searchParams.toString()}`);
     
+    const headersList = await headers();
     const res = await fetch(url, {
-      headers: headers(),
+      headers: headersList,
       cache: 'no-store'
     });
     
@@ -111,7 +114,8 @@ async function fetchTestCases(projectId: string, params: Props['searchParams']):
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const project = await fetchProject(params.id);
+  const paramsData = await params;
+  const project = await fetchProject(paramsData.id);
   
   if (!project) {
     return {
@@ -126,7 +130,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function TestCasesPage({ params, searchParams }: Props) {
-  const { id } = params;
+  const paramsData = await params;
+  const searchParamsData = await searchParams;
+  const id = paramsData.id;
   
   // Fetch project data
   const project = await fetchProject(id);
@@ -136,7 +142,7 @@ export default async function TestCasesPage({ params, searchParams }: Props) {
   }
   
   // Fetch test cases
-  const testCasesData = await fetchTestCases(id, searchParams);
+  const testCasesData = await fetchTestCases(id, searchParamsData);
   
   // Ensure we have testCases array or provide a default empty array
   const testCases = testCasesData?.testCases || [];

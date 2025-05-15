@@ -19,6 +19,15 @@ export default withAuth(
       return NextResponse.redirect(new URL(`/auth/signin?callbackUrl=${callbackUrl}`, req.url));
     }
     
+    // If session has an error (invalidated by session callback), redirect to login
+    if (req.nextauth.token?.invalidated || (req.nextauth.token as any)?.error) {
+      // Clear the session cookie and redirect to login
+      const response = NextResponse.redirect(new URL('/auth/signin', req.url));
+      response.cookies.delete('next-auth.session-token');
+      response.cookies.delete('__Secure-next-auth.session-token');
+      return response;
+    }
+    
     // If session is valid but expired (e.g., token is about to expire)
     if (req.nextauth.token && typeof req.nextauth.token.exp === 'number') {
       const expiresInSeconds = req.nextauth.token.exp - Math.floor(Date.now() / 1000);

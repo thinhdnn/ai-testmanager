@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TestCaseRepository } from '@/lib/db/repositories/test-case-repository';
 import { getCurrentUserEmail } from '@/lib/auth/session';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
 
 // GET /api/projects/[id]/test-cases
 export async function GET(
@@ -56,6 +57,20 @@ export async function POST(
       createdBy: userEmail,
       updatedBy: userEmail,
     });
+
+    // Create test file for automated tests if not manual
+    if (!testCase.isManual) {
+      try {
+        console.log(`Creating test file for test case ID: ${testCase.id}`);
+        const testManager = new TestManagerService(process.cwd());
+        await testManager.createTestFile(testCase.id);
+        console.log(`Test file created successfully for test case ID: ${testCase.id}`);
+      } catch (fileError) {
+        console.error('Error creating test file:', fileError);
+        // We don't fail the request if file creation fails
+        // Just log the error and continue
+      }
+    }
 
     return NextResponse.json(testCase, { status: 201 });
   } catch (error) {

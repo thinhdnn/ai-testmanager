@@ -80,6 +80,32 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      // Verify that the user still exists in the database
+      if (token.id) {
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: token.id as string },
+          });
+          
+          // If user no longer exists or is inactive, set invalidated flag
+          if (!user || !user.isActive) {
+            token.invalidated = true;
+            return { ...session, error: "Session invalidated" };
+          }
+        } catch (error) {
+          console.error("Error verifying session user:", error);
+          // On DB error, set invalidated flag
+          token.invalidated = true;
+          return { ...session, error: "Session verification error" };
+        }
+      }
+      
+      // Check for invalidation flag
+      if (token.invalidated) {
+        return { ...session, error: "Session invalidated" };
+      }
+      
+      // User exists, populate session
       if (session.user && token) {
         session.user.id = token.id;
         session.user.roles = token.roles;
@@ -94,7 +120,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 4 * 60 * 60, // 4 hours
   },
   secret: process.env.NEXTAUTH_SECRET,
 }; 

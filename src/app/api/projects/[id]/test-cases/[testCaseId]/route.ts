@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TestCaseRepository } from '@/lib/db/repositories/test-case-repository';
 import { checkResourcePermission } from '@/lib/rbac/check-permission';
 import { getCurrentUserEmail } from '@/lib/auth/session';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
 
 // GET /api/projects/[id]/test-cases/[testCaseId]
 export async function GET(
@@ -99,6 +100,19 @@ export async function PUT(
       tags,
       updatedBy: userEmail
     });
+    
+    // If the test case is not manual, update or generate test file
+    if (!updatedTestCase.isManual) {
+      try {
+        console.log(`Updating test file for test case ID: ${testCaseId}`);
+        const testManager = new TestManagerService(process.cwd());
+        await testManager.createTestFile(testCaseId);
+        console.log(`Test file updated successfully for test case ID: ${testCaseId}`);
+      } catch (fileError) {
+        console.error('Error updating test file:', fileError);
+        // We don't fail the request if file update fails
+      }
+    }
     
     return NextResponse.json(updatedTestCase);
   } catch (error) {

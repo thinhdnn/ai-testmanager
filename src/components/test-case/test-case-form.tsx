@@ -154,12 +154,12 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
       } catch (error) {
         console.error('Error fetching tags:', error);
         if (isMounted) {
-          setTagOptions(defaultTagOptions);
+        setTagOptions(defaultTagOptions);
         }
       }
     }
 
-    fetchTags();
+      fetchTags();
     
     // Cleanup function to prevent setting state on unmounted component
     return () => {
@@ -194,15 +194,15 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
   const createProjectTag = useCallback(async (tagValue: string) => {
     try {
       const newTag = await testCaseService.createProjectTag(projectId, tagValue);
-      console.log('New tag created:', newTag);
-      
-      // Update tag options with the new tag
-      setTagOptions(prev => {
-        if (prev.some(t => t.value === newTag.value)) {
-          return prev;
-        }
-        return [...prev, newTag];
-      });
+        console.log('New tag created:', newTag);
+        
+        // Update tag options with the new tag
+        setTagOptions(prev => {
+          if (prev.some(t => t.value === newTag.value)) {
+            return prev;
+          }
+          return [...prev, newTag];
+        });
     } catch (error) {
       console.error('Error creating tag:', error);
     }
@@ -239,30 +239,59 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
         tags: selectedTags.join(',') // Join tags as comma-separated string
       };
 
-      console.log('Submitting test case with payload:', payload);
+      console.log('[TestCaseForm] Submitting test case with payload:', payload);
+      console.log('[TestCaseForm] Project ID:', projectId);
 
-      let response;
-      if (isEditing && testCase?.id) {
-        // Type assertion to make TypeScript happy
-        response = await testCaseService.updateTestCase(projectId, testCase.id, payload as any);
-      } else {
-        // Type assertion to make TypeScript happy
-        response = await testCaseService.createTestCase(projectId, payload as any);
+      let response: any;
+      
+      // Try-catch block specifically for the API call
+      try {
+        if (isEditing && testCase?.id) {
+          console.log('[TestCaseForm] Updating test case ID:', testCase.id);
+          response = await testCaseService.updateTestCase(projectId, testCase.id, payload as any);
+        } else {
+          console.log('[TestCaseForm] Creating new test case');
+          response = await testCaseService.createTestCase(projectId, payload as any);
+        }
+      } catch (apiError) {
+        console.error('[TestCaseForm] API call error:', apiError);
+        toast.error(apiError instanceof Error ? apiError.message : 'Failed to communicate with the server');
+        return;
       }
 
+      console.log('[TestCaseForm] API response:', response);
+      
+      // Check if response exists
+      if (!response) {
+        console.error('[TestCaseForm] Empty response received from API');
+        toast.error('Error: No response received from API');
+        return;
+      }
+      
+      // Check if response has an ID
+      if (!response.id) {
+        console.error('[TestCaseForm] Response missing ID:', response);
+        toast.error('Error: Invalid response from API (missing ID)');
+        return;
+      }
+      
       toast.success(
         isEditing ? 'Test case updated successfully' : 'Test case created successfully'
       );
 
-      // If creating a new test case, navigate to the newly created test case
-      if (!isEditing) {
-        router.push(`/projects/${projectId}/test-cases/${response.id}`);
-      } else {
-        // If editing, refresh the page to show updated data
-        router.refresh();
+      // Simplify navigation logic - force browser navigation in both cases
+      const navigateTo = `/projects/${projectId}/test-cases/${response.id}`;
+      console.log(`[TestCaseForm] Navigating to: ${navigateTo}`);
+      
+      // Force direct navigation using window.location
+      if (typeof window !== 'undefined') {
+        // Force page change
+        window.location.href = navigateTo;
       }
+      
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+      console.error('[TestCaseForm] Unexpected error:', error);
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

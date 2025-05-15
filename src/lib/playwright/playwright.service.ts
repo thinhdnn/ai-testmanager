@@ -15,6 +15,16 @@ function sanitizeFolderName(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
+// Register handlebar helpers
+Handlebars.registerHelper('any', function(array: any[], prop: string, value: any) {
+  if (!array || !array.length) return false;
+  return array.some(item => item[prop] === value);
+});
+
+Handlebars.registerHelper('eq', function(a: any, b: any) {
+  return a === b;
+});
+
 export class PlaywrightService {
   private readonly projectRoot: string;
   private readonly templatePath: string;

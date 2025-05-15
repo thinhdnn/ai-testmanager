@@ -38,11 +38,28 @@ export class TestCaseService {
   }
 
   async createTestCase(projectId: string, testCase: Partial<TestCase>): Promise<TestCase> {
-    const response = await this.apiClient.post<{ testCase: TestCase }>(
-      `/projects/${projectId}/test-cases`,
-      testCase
-    );
-    return response.testCase;
+    try {
+      console.log(`[TestCaseService] Creating test case for project ${projectId}:`, testCase);
+      const response = await this.apiClient.post<TestCase>(
+        `/projects/${projectId}/test-cases`,
+        testCase
+      );
+      console.log('[TestCaseService] Create test case response:', response);
+      
+      if (!response) {
+        throw new Error('Empty response received from API');
+      }
+      
+      if (!response.id) {
+        console.error('[TestCaseService] Missing ID in response:', response);
+        throw new Error('Invalid response format: missing test case ID');
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('[TestCaseService] Error creating test case:', error);
+      throw error;
+    }
   }
 
   async updateTestCase(projectId: string, testCaseId: string, testCase: Partial<TestCase>): Promise<TestCase> {
