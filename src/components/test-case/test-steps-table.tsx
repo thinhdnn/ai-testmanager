@@ -425,9 +425,16 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
   // Handle toggling a step's disabled state
   const handleToggleDisabled = async (step: Step) => {
     try {
+      setIsLoading(true);
+      
+      // Determine the new disabled state
+      const newDisabledState = !step.disabled;
+      console.log(`Toggling step ${step.id} from ${step.disabled} to ${newDisabledState}`);
+      
       // Use the appropriate service based on whether it's a fixture or test case
+      let updatedStep;
       if (isFixture && step.fixtureId) {
-        await fixtureService.updateFixtureStep(
+        updatedStep = await fixtureService.updateFixtureStep(
           projectId, 
           step.fixtureId, 
           step.id, 
@@ -437,12 +444,12 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
             expected: step.expected || undefined,
             fixtureId: step.fixtureId || undefined,
             playwrightScript: step.playwrightScript || undefined,
-            disabled: !step.disabled,
+            disabled: newDisabledState,
             order: step.order,
           }
         );
       } else {
-        await testCaseService.updateTestCaseStep(
+        updatedStep = await testCaseService.updateTestCaseStep(
           projectId, 
           testCaseId, 
           step.id, 
@@ -452,15 +459,20 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
             expected: step.expected || undefined,
             fixtureId: step.fixtureId || undefined,
             playwrightScript: step.playwrightScript || undefined,
-            disabled: !step.disabled,
+            disabled: newDisabledState,
             order: step.order,
           }
         );
       }
       
-      // Update the local state
+      console.log('Server response:', updatedStep);
+      
+      // Update the local state - use the response from server if available, otherwise use our expected state
       setSteps(prevSteps => 
-        prevSteps.map(s => s.id === step.id ? { ...s, disabled: !s.disabled } : s)
+        prevSteps.map(s => s.id === step.id ? 
+          { ...s, disabled: updatedStep?.disabled !== undefined ? updatedStep.disabled : newDisabledState } 
+          : s
+        )
       );
       
       // If there's an onVersionUpdate callback, update the parent component
@@ -473,9 +485,19 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
         onStepsChange();
       }
       
-      toast.success(`Step ${step.disabled ? 'enabled' : 'disabled'}`);
+      // Check if the update was successful by comparing with our expected state
+      if (updatedStep?.disabled !== undefined && updatedStep.disabled !== newDisabledState) {
+        toast.error(`Failed to ${newDisabledState ? 'disable' : 'enable'} step - server returned inconsistent state`);
+      } else {
+        toast.success(newDisabledState ? 'Step disabled successfully' : 'Step enabled successfully');
+      }
+      
+      // Also refresh the router to ensure server-side data is updated
+      router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -711,6 +733,23 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
                               >
                                 <Target className="mr-2 h-4 w-4" />
                                 Move To...
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleToggleDisabled(step)}
+                                disabled={isLoading}
+                              >
+                                {step.disabled ? (
+                                  <>
+                                    <Badge variant="destructive" className="mr-2 h-4 text-xs">Off</Badge>
+                                    Enable Step
+                                  </>
+                                ) : (
+                                  <>
+                                    <Badge variant="default" className="mr-2 h-4 text-xs">On</Badge>
+                                    Disable Step
+                                  </>
+                                )}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                             <DropdownMenuItem

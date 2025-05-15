@@ -74,7 +74,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { action, data, expected, fixtureId } = body;
+    const { action, data, expected, fixtureId, disabled, order, playwrightScript } = body;
 
     // Validate required fields
     if (!action) {
@@ -100,6 +100,9 @@ export async function PUT(
       data,
       expected,
       fixtureId,
+      disabled: typeof disabled === 'boolean' ? disabled : step.disabled,
+      order: typeof order === 'number' ? order : step.order,
+      playwrightScript,
       updatedBy: userEmail
     });
 
