@@ -41,9 +41,9 @@ export class TestCaseService {
     try {
       console.log(`[TestCaseService] Creating test case for project ${projectId}:`, testCase);
       const response = await this.apiClient.post<TestCase>(
-        `/projects/${projectId}/test-cases`,
-        testCase
-      );
+      `/projects/${projectId}/test-cases`,
+      testCase
+    );
       console.log('[TestCaseService] Create test case response:', response);
       
       if (!response) {

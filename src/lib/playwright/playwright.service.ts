@@ -25,6 +25,10 @@ Handlebars.registerHelper('eq', function(a: any, b: any) {
   return a === b;
 });
 
+Handlebars.registerHelper('add', function(a: number, b: number) {
+  return a + b;
+});
+
 export class PlaywrightService {
   private readonly projectRoot: string;
   private readonly templatePath: string;

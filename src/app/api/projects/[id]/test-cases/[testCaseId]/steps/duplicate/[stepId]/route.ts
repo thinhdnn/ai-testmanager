@@ -7,6 +7,7 @@ import { TestCaseVersionRepository } from '@/lib/db/repositories/test-case-versi
 import { StepVersionRepository } from '@/lib/db/repositories/step-version-repository';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { incrementVersion } from '@/lib/utils/version';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
 
 // POST /api/projects/[id]/test-cases/[testCaseId]/steps/duplicate/[stepId]
 export async function POST(
@@ -101,6 +102,19 @@ export async function POST(
           disabled: step.disabled || false,
           createdBy: userEmail || undefined
         });
+      }
+    }
+    
+    // Generate test file if the test case is not manual
+    if (!testCase.isManual) {
+      try {
+        console.log(`Updating test file for test case ID: ${testCaseId}`);
+        const testManager = new TestManagerService(process.cwd());
+        await testManager.createTestFile(testCaseId);
+        console.log(`Test file updated successfully for test case ID: ${testCaseId}`);
+      } catch (fileError) {
+        console.error('Error updating test file:', fileError);
+        // We don't fail the request if file update fails
       }
     }
     

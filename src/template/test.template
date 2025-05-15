@@ -42,7 +42,7 @@ test('{{testCaseName}}', async ({{#if (any fixtures "mode" "extend")}}{ page{{#e
 
   // Test Steps
   {{#each steps}}
-  // Step {{order}}: {{action}}
+  // Step {{add @index 1}}: {{action}}
   {{#if disabled}}
   /* DISABLED STEP
   {{{playwrightCode}}}
@@ -51,10 +51,17 @@ test('{{testCaseName}}', async ({{#if (any fixtures "mode" "extend")}}{ page{{#e
   {{/if}}
   */
   {{else}}
+  {{#if playwrightCode}}
   {{{playwrightCode}}}
+  {{else}}
+  // TODO: Implement this step
+  {{/if}}
   {{#if expected}}
   // Expected: {{expected}}
   {{/if}}
   {{/if}}
+  {{#unless @last}}
+
+  {{/unless}}
   {{/each}}
 });

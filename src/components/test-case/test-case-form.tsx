@@ -243,7 +243,7 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
       console.log('[TestCaseForm] Project ID:', projectId);
 
       let response: any;
-      
+
       // Try-catch block specifically for the API call
       try {
         if (isEditing && testCase?.id) {
@@ -274,7 +274,7 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
         toast.error('Error: Invalid response from API (missing ID)');
         return;
       }
-      
+
       toast.success(
         isEditing ? 'Test case updated successfully' : 'Test case created successfully'
       );
