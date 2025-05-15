@@ -12,7 +12,7 @@ export async function GET(
     const { id: projectId, testCaseId, versionId } = params;
     
     // Check permission
-    const hasPermission = await checkResourcePermission('testcase', 'view', projectId);
+    const hasPermission = await checkResourcePermission('project', 'view', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -44,7 +44,7 @@ export async function PUT(
     const userEmail = await getCurrentUserEmail();
     
     // Check permission
-    const hasPermission = await checkResourcePermission('testcase', 'update', projectId);
+    const hasPermission = await checkResourcePermission('project', 'update', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -93,7 +93,7 @@ export async function DELETE(
     const { id: projectId, testCaseId, versionId } = params;
     
     // Check permission
-    const hasPermission = await checkResourcePermission('testcase', 'delete', projectId);
+    const hasPermission = await checkResourcePermission('project', 'update', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

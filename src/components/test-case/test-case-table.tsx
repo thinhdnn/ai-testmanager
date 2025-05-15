@@ -56,6 +56,7 @@ import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/utils/date';
 import { Edit, Play, MoreHorizontal, Copy, Trash, Search, X, ArrowUpDown, ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { TestCaseService } from '@/lib/api/services';
 
 // Type for sorting direction
 type SortDirection = 'asc' | 'desc' | null;
@@ -113,6 +114,9 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
   
   // Local state to track test cases for immediate UI updates
   const [localTestCases, setLocalTestCases] = useState<TestCase[]>(Array.isArray(testCases) ? testCases : []);
+  
+  // Create a memoized instance of TestCaseService
+  const testCaseService = useMemo(() => new TestCaseService(), []);
   
   // Update local state when prop changes
   useEffect(() => {
@@ -308,24 +312,15 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
     setSortDirection(null);
   };
 
-  // Handle test case deletion
+  // Handle test case deletion using service
   const handleDeleteTestCase = async () => {
     if (!testCaseToDelete) return;
     
     try {
       setIsDeleting(true);
       
-      const response = await fetch(`/api/projects/${projectId}/test-cases/${testCaseToDelete.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete test case');
-      }
+      // Use the service instead of direct fetch
+      await testCaseService.deleteTestCase(projectId, testCaseToDelete.id);
       
       toast.success('Test case deleted successfully');
       
@@ -344,6 +339,22 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Clone a test case using service
+  const handleCloneTestCase = async (testCase: TestCase) => {
+    try {
+      // Use the service instead of direct fetch
+      const clonedTestCase = await testCaseService.cloneTestCase(projectId, testCase.id);
+      
+      toast.success('Test case cloned successfully');
+      
+      // Navigate to the new cloned test case
+      router.push(`/projects/${projectId}/test-cases/${clonedTestCase.id}`);
+    } catch (error) {
+      console.error('Error cloning test case:', error);
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
     }
   };
 
@@ -543,32 +554,7 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  try {
-                                    const response = await fetch(`/api/projects/${projectId}/test-cases/${testCase.id}/clone`, {
-                                      method: 'POST',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                      }
-                                    });
-                                    
-                                    if (!response.ok) {
-                                      const errorData = await response.json();
-                                      throw new Error(errorData.error || 'Failed to clone test case');
-                                    }
-                                    
-                                    const data = await response.json();
-                                    toast.success('Test case cloned successfully');
-                                    
-                                    // Navigate to the new cloned test case
-                                    router.push(`/projects/${projectId}/test-cases/${data.testCase.id}`);
-                                  } catch (error) {
-                                    console.error('Error cloning test case:', error);
-                                    toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
-                                  }
-                                }}
-                              >
+                              <DropdownMenuItem onClick={() => handleCloneTestCase(testCase)}>
                                 <Copy className="mr-2 h-4 w-4" />
                                 <span>Clone</span>
                               </DropdownMenuItem>

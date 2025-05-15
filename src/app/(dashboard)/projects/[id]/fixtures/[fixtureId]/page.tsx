@@ -132,7 +132,7 @@ export default function FixtureDetailPage() {
   const [versionSteps, setVersionSteps] = useState<Step[]>([]);
   
   const canEdit = usePermission('update', 'project', projectId);
-  const canDelete = usePermission('delete', 'project', projectId);
+  const canDelete = usePermission('update', 'project', projectId);
   
   const fetchProject = async (projectId: string): Promise<Project | null> => {
     const res = await fetch(`/api/projects/${projectId}`);

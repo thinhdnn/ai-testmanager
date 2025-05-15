@@ -16,12 +16,16 @@ export async function POST(
   { params }: { params: { id: string; testCaseId: string } }
 ) {
   try {
-    const { id: projectId, testCaseId } = params;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
+    const testCaseId = params_data.testCaseId;
+    
     const userEmail = await getCurrentUserEmail();
     
     // Check if user has permission to update test steps
     const hasPermission = await checkResourcePermission(
-      'testcase',
+      'project',
       'update',
       projectId
     );

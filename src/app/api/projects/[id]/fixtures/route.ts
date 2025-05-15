@@ -16,7 +16,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const projectId = params.id;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
+    
     const hasPermission = await checkResourcePermission('project', 'view', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -67,7 +70,10 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const projectId = params.id;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
+    
     const userEmail = await getCurrentUserEmail();
 
     // Log params for debugging

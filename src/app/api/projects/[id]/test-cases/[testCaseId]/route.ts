@@ -6,13 +6,20 @@ import { getCurrentUserEmail } from '@/lib/auth/session';
 // GET /api/projects/[id]/test-cases/[testCaseId]
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string } }
+  context: { params: { id: string; testCaseId: string } }
 ) {
   try {
-    const { id: projectId, testCaseId } = params;
+    // Wait for params to be available
+    const params = await Promise.resolve(context.params);
+    const projectId = params.id;
+    const testCaseId = params.testCaseId;
     
-    //Check permission
-    const hasPermission = await checkResourcePermission('testcase', 'view', projectId);
+    if (!projectId || !testCaseId) {
+      return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
+    }
+    
+    // Check permission - changed 'testcase' to 'testCase' to match RBAC system
+    const hasPermission = await checkResourcePermission('project', 'view', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -43,14 +50,22 @@ export async function GET(
 // PUT /api/projects/[id]/test-cases/[testCaseId]
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string } }
+  context: { params: { id: string; testCaseId: string } }
 ) {
   try {
-    const { id: projectId, testCaseId } = params;
+    // Wait for params to be available
+    const params = await Promise.resolve(context.params);
+    const projectId = params.id;
+    const testCaseId = params.testCaseId;
+    
+    if (!projectId || !testCaseId) {
+      return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
+    }
+    
     const userEmail = await getCurrentUserEmail();
     
-    // Check permission
-    const hasPermission = await checkResourcePermission('testcase', 'update', projectId);
+    // Check permission - changed 'testcase' to 'project' to use inheritance model
+    const hasPermission = await checkResourcePermission('project', 'update', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -98,13 +113,20 @@ export async function PUT(
 // DELETE /api/projects/[id]/test-cases/[testCaseId]
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string } }
+  context: { params: { id: string; testCaseId: string } }
 ) {
   try {
-    const { id: projectId, testCaseId } = params;
+    // Wait for params to be available
+    const params = await Promise.resolve(context.params);
+    const projectId = params.id;
+    const testCaseId = params.testCaseId;
     
-    // Check permission
-    const hasPermission = await checkResourcePermission('testcase', 'delete', projectId);
+    if (!projectId || !testCaseId) {
+      return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
+    }
+    
+    // Check permission - changed 'testcase' to 'project' to use inheritance model
+    const hasPermission = await checkResourcePermission('project', 'update', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

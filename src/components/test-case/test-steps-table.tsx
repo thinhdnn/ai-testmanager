@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { usePermission } from '@/lib/auth/use-permission';
@@ -20,7 +20,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -28,10 +27,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,11 +34,8 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { 
   Edit, 
@@ -51,32 +43,32 @@ import {
   Trash, 
   Copy, 
   Plus, 
-  ChevronUp, 
-  ChevronDown,
   MoveUp,
   MoveDown,
   Loader2,
   Code,
   ChevronRight,
   Target,
-  Wrench,
-  Search
+  Wrench
 } from 'lucide-react';
+import { TestCaseService } from '@/lib/api/services/test-case-service';
+import { FixtureService } from '@/lib/api/services/fixture-service';
+import { Step as ApiStep } from '@/lib/api/interfaces';
 
 interface Step {
   id: string;
   action: string;
-  data?: string | null;
-  expected?: string | null;
+  data?: string | undefined;
+  expected?: string | undefined;
   order: number;
   disabled: boolean;
-  fixtureId?: string | null;
+  fixtureId?: string | undefined;
   fixture?: {
     id: string;
     name: string;
     type: string;
-  } | null;
-  playwrightScript?: string | null;
+  } | undefined;
+  playwrightScript?: string | undefined;
 }
 
 interface TestStepsTableProps {
@@ -111,6 +103,10 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
   const [showFixtureSuggestions, setShowFixtureSuggestions] = useState(false);
   const [filteredFixtures, setFilteredFixtures] = useState<Fixture[]>([]);
   
+  // Memoize service instances to prevent unnecessary re-creation
+  const testCaseService = useMemo(() => new TestCaseService(), []);
+  const fixtureService = useMemo(() => new FixtureService(), []);
+  
   // Determine if we're handling fixture steps or test case steps
   const isFixture = !!initialSteps.find(step => step.fixtureId);
   
@@ -128,7 +124,8 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
     playwrightScript: '',
   });
   
-  const canEdit = usePermission('update', 'testcase', projectId);
+  // Use project.update instead of testcase.update for permission check
+  const canEdit = usePermission('update', 'project', projectId);
   
   // Reset forms when dialogs open/close
   useEffect(() => {
@@ -154,14 +151,9 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
   const fetchFixtures = async () => {
     try {
       setIsLoadingFixtures(true);
-      const response = await fetch(`/api/projects/${projectId}/fixtures`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch fixtures');
-      }
-      
-      const data = await response.json();
-      setFixtures(data.fixtures || []);
+      const response = await fixtureService.getFixtures(projectId);
+      setFixtures(response.fixtures || []);
     } catch (error) {
       console.error('Error fetching fixtures:', error);
     } finally {
@@ -213,38 +205,33 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
     try {
       setIsLoading(true);
       
-      // Construct the endpoint based on whether we're dealing with a fixture or test case
-      const endpoint = isFixture 
-        ? `/api/projects/${projectId}/fixtures/${testCaseId}/steps`
-        : `/api/projects/${projectId}/test-cases/${testCaseId}/steps`;
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      let result;
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture) {
+        result = await fixtureService.createFixtureStep(projectId, testCaseId, {
           action: formData.action,
-          data: formData.data || null,
-          expected: formData.expected || null,
-          fixtureId: formData.fixtureId || null,
-          playwrightScript: formData.playwrightScript || null,
-        }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to add step');
+          data: formData.data || undefined,
+          expected: formData.expected || undefined,
+          fixtureId: formData.fixtureId || undefined,
+          playwrightScript: formData.playwrightScript || undefined,
+        });
+      } else {
+        const response = await testCaseService.createTestCaseStep(projectId, testCaseId, {
+          action: formData.action,
+          data: formData.data || undefined,
+          expected: formData.expected || undefined,
+          fixtureId: formData.fixtureId || undefined,
+          playwrightScript: formData.playwrightScript || undefined,
+        });
+        result = response;
       }
       
-      const data = await response.json();
-      
       // Update local state with the new step
-      setSteps(prevSteps => [...prevSteps, data.step]);
+      setSteps(prevSteps => [...prevSteps, result as Step]);
       
       // If there's version info and onVersionUpdate callback, update the parent component
-      if (data.version && onVersionUpdate) {
-        onVersionUpdate(data.version);
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
       }
 
       // Notify the parent component to refresh steps
@@ -277,45 +264,48 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
     try {
       setIsLoading(true);
       
-      // Construct the endpoint based on whether we're dealing with a fixture or test case
-      const endpoint = isFixture
-        ? `/api/projects/${projectId}/fixtures/${testCaseId}/steps/${activeStep.id}`
-        : `/api/projects/${projectId}/test-cases/${testCaseId}/steps/${activeStep.id}`;
-      
-      const response = await fetch(
-        endpoint,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+      let result;
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture) {
+        result = await fixtureService.updateFixtureStep(
+          projectId, 
+          testCaseId, 
+          activeStep.id, 
+          {
             action: formData.action,
-            data: formData.data || null,
-            expected: formData.expected || null,
-            fixtureId: formData.fixtureId || null,
-            playwrightScript: formData.playwrightScript || null,
+            data: formData.data || undefined,
+            expected: formData.expected || undefined,
+            fixtureId: formData.fixtureId || undefined,
+            playwrightScript: formData.playwrightScript || undefined,
             disabled: activeStep.disabled,
             order: activeStep.order,
-          }),
-        }
-      );
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update step');
+          }
+        );
+      } else {
+        result = await testCaseService.updateTestCaseStep(
+          projectId, 
+          testCaseId, 
+          activeStep.id, 
+          {
+            action: formData.action,
+            data: formData.data || undefined,
+            expected: formData.expected || undefined,
+            fixtureId: formData.fixtureId || undefined,
+            playwrightScript: formData.playwrightScript || undefined,
+            disabled: activeStep.disabled,
+            order: activeStep.order,
+          }
+        );
       }
-      
-      const data = await response.json();
       
       // Update local state with the updated step
       setSteps(prevSteps => 
-        prevSteps.map(step => step.id === activeStep.id ? data.step : step)
+        prevSteps.map(step => step.id === activeStep.id ? result as Step : step)
       );
       
-      // If there's version info and onVersionUpdate callback, update the parent component
-      if (data.version && onVersionUpdate) {
-        onVersionUpdate(data.version);
+      // If there's an onVersionUpdate callback, update the parent component
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
       }
       
       // Notify the parent component to refresh steps
@@ -343,33 +333,19 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
     try {
       setIsLoading(true);
       
-      // Construct the endpoint based on whether we're dealing with a fixture or test case
-      const endpoint = isFixture
-        ? `/api/projects/${projectId}/fixtures/${activeStep.fixtureId}/steps/${activeStep.id}`
-        : `/api/projects/${projectId}/test-cases/${testCaseId}/steps/${activeStep.id}`;
-      
-      console.log('Delete step endpoint:', endpoint);
-      
-      const response = await fetch(
-        endpoint,
-        {
-          method: 'DELETE',
-        }
-      );
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete step');
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture && activeStep.fixtureId) {
+        await fixtureService.deleteFixtureStep(projectId, activeStep.fixtureId, activeStep.id);
+      } else {
+        await testCaseService.deleteTestCaseStep(projectId, testCaseId, activeStep.id);
       }
-      
-      const data = await response.json();
       
       // Remove the step from the local state
       setSteps(prevSteps => prevSteps.filter(step => step.id !== activeStep.id));
       
-      // If there's version info and onVersionUpdate callback, update the parent component
-      if (data.version && onVersionUpdate) {
-        onVersionUpdate(data.version);
+      // If there's an onVersionUpdate callback, update the parent component
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
       }
       
       // Notify the parent component to refresh steps
@@ -416,37 +392,16 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
         return;
       }
       
-      // Construct the endpoint based on whether we're dealing with a fixture or test case
-      const endpoint = isFixture
-        ? `/api/projects/${projectId}/fixtures/${stepToMove.fixtureId}/steps/${stepId}/move`
-        : `/api/projects/${projectId}/test-cases/${testCaseId}/steps/${stepId}/move`;
-      
-      console.log('Move step endpoint:', endpoint);
-      
-      // Call the API to move the step
-      const response = await fetch(
-        endpoint,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            position: newPosition,
-          }),
-        }
-      );
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to move step');
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture && stepToMove.fixtureId) {
+        await fixtureService.moveFixtureStep(projectId, stepToMove.fixtureId, stepId, newPosition);
+      } else {
+        await testCaseService.moveTestCaseStep(projectId, testCaseId, stepId, newPosition);
       }
       
-      const data = await response.json();
-      
-      // If there's version info and onVersionUpdate callback, update the parent component
-      if (data.version && onVersionUpdate) {
-        onVersionUpdate(data.version);
+      // If there's an onVersionUpdate callback, update the parent component
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
       }
       
       // Notify the parent component to refresh steps
@@ -470,42 +425,47 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
   // Handle toggling a step's disabled state
   const handleToggleDisabled = async (step: Step) => {
     try {
-      // Construct the endpoint based on whether we're dealing with a fixture or test case
-      const endpoint = isFixture
-        ? `/api/projects/${projectId}/fixtures/${step.fixtureId}/steps/${step.id}`
-        : `/api/projects/${projectId}/test-cases/${testCaseId}/steps/${step.id}`;
-      
-      console.log('Toggle disabled endpoint:', endpoint);
-      
-      const response = await fetch(
-        endpoint,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...step,
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture && step.fixtureId) {
+        await fixtureService.updateFixtureStep(
+          projectId, 
+          step.fixtureId, 
+          step.id, 
+          {
+            action: step.action,
+            data: step.data || undefined,
+            expected: step.expected || undefined,
+            fixtureId: step.fixtureId || undefined,
+            playwrightScript: step.playwrightScript || undefined,
             disabled: !step.disabled,
-          }),
-        }
-      );
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update step');
+            order: step.order,
+          }
+        );
+      } else {
+        await testCaseService.updateTestCaseStep(
+          projectId, 
+          testCaseId, 
+          step.id, 
+          {
+            action: step.action,
+            data: step.data || undefined,
+            expected: step.expected || undefined,
+            fixtureId: step.fixtureId || undefined,
+            playwrightScript: step.playwrightScript || undefined,
+            disabled: !step.disabled,
+            order: step.order,
+          }
+        );
       }
-      
-      const data = await response.json();
       
       // Update the local state
       setSteps(prevSteps => 
         prevSteps.map(s => s.id === step.id ? { ...s, disabled: !s.disabled } : s)
       );
       
-      // If there's version info and onVersionUpdate callback, update the parent component
-      if (data.version && onVersionUpdate) {
-        onVersionUpdate(data.version);
+      // If there's an onVersionUpdate callback, update the parent component
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
       }
       
       // Notify the parent component to refresh steps
@@ -524,33 +484,20 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
     try {
       setIsLoading(true);
       
-      // Construct the endpoint based on whether we're dealing with a fixture or test case
-      const endpoint = isFixture
-        ? `/api/projects/${projectId}/fixtures/${step.fixtureId}/steps/duplicate/${step.id}`
-        : `/api/projects/${projectId}/test-cases/${testCaseId}/steps/duplicate/${step.id}`;
-      
-      console.log('Duplicate step endpoint:', endpoint);
-      
-      const response = await fetch(
-        endpoint,
-        {
-          method: 'POST',
-        }
-      );
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to duplicate step');
+      let result;
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture && step.fixtureId) {
+        result = await fixtureService.duplicateFixtureStep(projectId, step.fixtureId, step.id);
+      } else {
+        result = await testCaseService.duplicateTestCaseStep(projectId, testCaseId, step.id);
       }
       
-      const data = await response.json();
-      
       // Update local state with the new duplicated step
-      setSteps(prevSteps => [...prevSteps, data.step]);
+      setSteps(prevSteps => [...prevSteps, result as Step]);
       
-      // If there's version info and onVersionUpdate callback, update the parent component
-      if (data.version && onVersionUpdate) {
-        onVersionUpdate(data.version);
+      // If there's an onVersionUpdate callback, update the parent component
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
       }
       
       // Notify the parent component to refresh steps
@@ -582,37 +529,29 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
         return;
       }
       
-      // Construct the endpoint based on whether we're dealing with a fixture or test case
-      const endpoint = isFixture
-        ? `/api/projects/${projectId}/fixtures/${stepToMove.fixtureId}/steps/${stepToMove.id}/move`
-        : `/api/projects/${projectId}/test-cases/${testCaseId}/steps/${stepToMove.id}/move`;
+      // Convert from UI position (1-based) to API position (0-based)
+      const apiPosition = targetPosition - 1;
       
-      console.log('Move to position endpoint:', endpoint);
-      
-      // Call the API to move the step
-      const response = await fetch(
-        endpoint,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            position: targetPosition,
-          }),
-        }
-      );
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to move step');
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture && stepToMove.fixtureId) {
+        await fixtureService.moveFixtureStep(
+          projectId, 
+          stepToMove.fixtureId, 
+          stepToMove.id, 
+          apiPosition
+        );
+      } else {
+        await testCaseService.moveTestCaseStep(
+          projectId, 
+          testCaseId, 
+          stepToMove.id, 
+          apiPosition
+        );
       }
       
-      const data = await response.json();
-      
-      // If there's version info and onVersionUpdate callback, update the parent component
-      if (data.version && onVersionUpdate) {
-        onVersionUpdate(data.version);
+      // If there's an onVersionUpdate callback, update the parent component
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
       }
       
       // Notify the parent component to refresh steps

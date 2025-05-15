@@ -4,11 +4,19 @@ import { TestCaseVersionRepository } from '@/lib/db/repositories/test-case-versi
 // GET /api/projects/[id]/test-cases/[testCaseId]/versions
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string } }
+  context: { params: { id: string; testCaseId: string } }
 ) {
   try {
+    // Wait for params to be available
+    const params = await Promise.resolve(context.params);
+    const testCaseId = params.testCaseId;
+    
+    if (!testCaseId) {
+      return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });
+    }
+    
     const testCaseVersionRepository = new TestCaseVersionRepository();
-    const versions = await testCaseVersionRepository.findByTestCaseId(params.testCaseId);
+    const versions = await testCaseVersionRepository.findByTestCaseId(testCaseId);
 
     return NextResponse.json(versions);
   } catch (error) {

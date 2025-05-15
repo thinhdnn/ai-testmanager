@@ -11,14 +11,17 @@ import { incrementVersion } from '@/lib/utils/version';
 // GET /api/projects/[id]/test-cases/[testCaseId]/steps/[stepId]
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string; testCaseId: string; stepId: string } }
+  { params }: { params: { id: string; testCaseId: string; stepId: string } }
 ) {
   try {
-    const { projectId, stepId } = params;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
+    const stepId = params_data.stepId;
 
     // Check if user has permission to view test step
     const hasPermission = await checkResourcePermission(
-      'testcase',
+      'project',
       'view',
       projectId
     );
@@ -48,15 +51,20 @@ export async function GET(
 // PUT /api/projects/[id]/test-cases/[testCaseId]/steps/[stepId]
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { projectId: string; testCaseId: string; stepId: string } }
+  { params }: { params: { id: string; testCaseId: string; stepId: string } }
 ) {
   try {
-    const { projectId, testCaseId, stepId } = params;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
+    const testCaseId = params_data.testCaseId;
+    const stepId = params_data.stepId;
+    
     const userEmail = await getCurrentUserEmail();
 
     // Check if user has permission to update test step
     const hasPermission = await checkResourcePermission(
-      'testcase',
+      'project',
       'update',
       projectId
     );
@@ -149,16 +157,21 @@ export async function PUT(
 // DELETE /api/projects/[id]/test-cases/[testCaseId]/steps/[stepId]
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { projectId: string; testCaseId: string; stepId: string } }
+  { params }: { params: { id: string; testCaseId: string; stepId: string } }
 ) {
   try {
-    const { projectId, testCaseId, stepId } = params;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
+    const testCaseId = params_data.testCaseId;
+    const stepId = params_data.stepId;
+    
     const userEmail = await getCurrentUserEmail();
 
     // Check if user has permission to delete test step
     const hasPermission = await checkResourcePermission(
-      'testcase',
-      'delete',
+      'project',
+      'update',
       projectId
     );
 

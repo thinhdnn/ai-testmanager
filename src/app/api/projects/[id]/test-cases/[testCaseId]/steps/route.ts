@@ -11,14 +11,17 @@ import { incrementVersion } from '@/lib/utils/version';
 // GET /api/projects/[id]/test-cases/[testCaseId]/steps
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string; testCaseId: string } }
+  { params }: { params: { id: string; testCaseId: string } }
 ) {
   try {
-    const { projectId, testCaseId } = params;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
+    const testCaseId = params_data.testCaseId;
 
     // Check if user has permission to view test steps
     const hasPermission = await checkResourcePermission(
-      'testcase',
+      'project',
       'view',
       projectId
     );
@@ -44,15 +47,19 @@ export async function GET(
 // POST /api/projects/[id]/test-cases/[testCaseId]/steps
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string; testCaseId: string } }
+  { params }: { params: { id: string; testCaseId: string } }
 ) {
   try {
-    const { projectId, testCaseId } = params;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
+    const testCaseId = params_data.testCaseId;
+    
     const userEmail = await getCurrentUserEmail();
     
     // Check if user has permission to update test steps
     const hasPermission = await checkResourcePermission(
-      'testcase',
+      'project',
       'update',
       projectId
     );

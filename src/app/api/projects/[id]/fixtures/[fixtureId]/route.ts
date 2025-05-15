@@ -158,7 +158,7 @@ export async function DELETE(
     const { id: projectId, fixtureId } = params;
     
     // Check permission
-    const hasPermission = await checkResourcePermission('project', 'delete', projectId);
+    const hasPermission = await checkResourcePermission('project', 'update', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

@@ -8,8 +8,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Ensure params is awaited before using it
-    const projectId = params.id;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
     
     const testCaseRepository = new TestCaseRepository();
     const testCases = await testCaseRepository.findByProjectId(projectId);
@@ -30,8 +31,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Ensure params is awaited before using it
-    const projectId = params.id;
+    // In Next.js 15, params is a Promise that must be awaited
+    const params_data = await params;
+    const projectId = params_data.id;
     
     const userEmail = await getCurrentUserEmail();
     const data = await request.json();

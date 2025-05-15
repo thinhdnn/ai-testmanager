@@ -118,9 +118,9 @@ export class TestCaseService {
   }
 
   async moveTestCaseStep(projectId: string, testCaseId: string, stepId: string, order: number): Promise<Step> {
-    const response = await this.apiClient.put<{ step: Step }>(
-      `/projects/${projectId}/test-cases/${testCaseId}/steps/${stepId}/move`,
-      { order }
+    const response = await this.apiClient.post<{ step: Step }>(
+      `/projects/${projectId}/test-cases/${testCaseId}/steps/reorder`,
+      { stepId, newOrder: order }
     );
     return response.step;
   }
