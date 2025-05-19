@@ -37,7 +37,7 @@ const fixtureFormSchema = z.object({
     .refine(value => !/[<>:"/\\|?*]/.test(value), {
       message: 'Name contains invalid characters for a name',
     }),
-  type: z.enum(['data', 'logic'], {
+  type: z.enum(['extend', 'inline'], {
     required_error: 'Fixture type is required',
   }),
   exportName: z.string()
@@ -47,8 +47,6 @@ const fixtureFormSchema = z.object({
       (value) => !/\d+$/.test(value),
       'Export name should not end with numbers'
     ),
-  playwrightScript: z.string().optional(),
-  filename: z.string().optional(),
 });
 
 type FixtureFormValues = z.infer<typeof fixtureFormSchema>;
@@ -56,10 +54,8 @@ type FixtureFormValues = z.infer<typeof fixtureFormSchema>;
 interface Fixture {
   id: string;
   name: string;
-  playwrightScript: string | null;
   type: string;
   exportName: string | null;
-  filename: string | null;
   fixtureFilePath: string | null;
 }
 
@@ -73,21 +69,18 @@ export default function EditFixturePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fixture, setFixture] = useState<Fixture | null>(null);
   const [shouldAutoUpdateExportName, setShouldAutoUpdateExportName] = useState(true);
-  const [shouldAutoUpdateFilename, setShouldAutoUpdateFilename] = useState(true);
   
   // Initialize form with empty values, will be updated once fixture is loaded
   const form = useForm<FixtureFormValues>({
     resolver: zodResolver(fixtureFormSchema),
     defaultValues: {
       name: '',
-      type: 'data',
+      type: 'extend',
       exportName: '',
-      playwrightScript: '',
-      filename: '',
     },
   });
   
-  // Watch name field to auto-generate exportName and filename
+  // Watch name field to auto-generate exportName
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       if (name === 'name' && value.name) {
@@ -95,23 +88,19 @@ export default function EditFixturePage() {
         if (shouldAutoUpdateExportName) {
           form.setValue('exportName', toCamelCase(value.name));
         }
-        
-        if (shouldAutoUpdateFilename) {
-          const extension = form.getValues('type') === 'data' ? 'json' : 'js';
-          form.setValue('filename', toValidFileName(value.name, extension));
-        }
       }
     });
     return () => subscription.unsubscribe();
-  }, [form, shouldAutoUpdateExportName, shouldAutoUpdateFilename]);
+  }, [form, shouldAutoUpdateExportName]);
   
   // Track when user manually edits fields to stop auto-updating
   const handleExportNameChange = () => {
     setShouldAutoUpdateExportName(false);
   };
   
-  const handleFilenameChange = () => {
-    setShouldAutoUpdateFilename(false);
+  // Update type
+  const handleTypeChange = (value: 'extend' | 'inline') => {
+    form.setValue('type', value);
   };
   
   useEffect(() => {
@@ -140,8 +129,6 @@ export default function EditFixturePage() {
         name: data.name,
         type: data.type,
         exportName: data.exportName || '',
-        playwrightScript: data.playwrightScript || '',
-        filename: data.filename || '',
       });
     } catch (error) {
       toast.error('Failed to load fixture details');
@@ -206,7 +193,12 @@ export default function EditFixturePage() {
             <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">Fixture Not Found</h2>
             <p className="text-muted-foreground mb-6">The fixture you're trying to edit doesn't exist or you don't have permission to edit it.</p>
-            <Button asChild>
+            <Button 
+              variant="ghost"
+              size="sm"
+              asChild
+              className="flex items-center gap-1"
+            >
               <Link href={`/projects/${projectId}?tab=fixtures`}>
                 <ChevronLeft className="h-4 w-4 mr-2" />
                 Back to Fixtures
@@ -257,17 +249,7 @@ export default function EditFixturePage() {
                   <FormItem>
                     <FormLabel>Type</FormLabel>
                     <Select
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        // Update filename extension when type changes if auto-update is on
-                        if (shouldAutoUpdateFilename) {
-                          const currentName = form.getValues('name');
-                          if (currentName) {
-                            const extension = value === 'data' ? 'json' : 'js';
-                            form.setValue('filename', toValidFileName(currentName, extension));
-                          }
-                        }
-                      }}
+                      onValueChange={handleTypeChange}
                       defaultValue={field.value}
                     >
                       <FormControl>
@@ -276,12 +258,12 @@ export default function EditFixturePage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="data">Data</SelectItem>
-                        <SelectItem value="logic">Logic</SelectItem>
+                        <SelectItem value="extend">Extend</SelectItem>
+                        <SelectItem value="inline">Inline</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Data fixtures contain static data. Logic fixtures contain functions.
+                      Extend fixtures extend the base test with new functionality. Inline fixtures contain inline test logic.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -290,38 +272,24 @@ export default function EditFixturePage() {
               
               <FormField
                 control={form.control}
-                name="playwrightScript"
-                render={({ field }: { field: ControllerRenderProps<FixtureFormValues, "playwrightScript"> }) => (
+                name="exportName"
+                render={({ field }: { field: ControllerRenderProps<FixtureFormValues, "exportName"> }) => (
                   <FormItem>
-                    <FormLabel>Playwright Script</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The script to run this fixture in Playwright
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="filename"
-                render={({ field }: { field: ControllerRenderProps<FixtureFormValues, "filename"> }) => (
-                  <FormItem>
-                    <FormLabel>Filename</FormLabel>
+                    <FormLabel>Export Name</FormLabel>
                     <FormControl>
                       <Input 
+                        placeholder="Enter export name" 
                         {...field} 
                         onChange={(e) => {
                           field.onChange(e);
-                          handleFilenameChange();
+                          handleExportNameChange();
                         }}
                       />
                     </FormControl>
                     <FormDescription>
-                      The filename for this fixture
+                      {shouldAutoUpdateExportName 
+                        ? "Export name will be automatically updated when fixture name changes" 
+                        : "Export name is manually set and won't update automatically"}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -330,11 +298,15 @@ export default function EditFixturePage() {
               
               <div className="flex justify-end gap-4">
                 <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push(`/projects/${projectId}/fixtures/${fixtureId}`)}
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  className="flex items-center gap-1"
                 >
-                  Cancel
+                  <Link href={`/projects/${projectId}/fixtures/${fixtureId}`}>
+                    <ChevronLeft className="h-4 w-4" />
+                    Back to Fixture
+                  </Link>
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

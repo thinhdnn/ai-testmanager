@@ -4,6 +4,8 @@ import { FixtureRepository } from '@/lib/db/repositories/fixture-repository';
 import { StepRepository } from '@/lib/db/repositories/step-repository';
 import { checkResourcePermission } from '@/lib/rbac/check-permission';
 import { getCurrentUserEmail } from '@/lib/auth/session';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import path from 'path';
 
 // POST /api/projects/[id]/fixtures/[fixtureId]/clone
 export async function POST(
@@ -11,7 +13,8 @@ export async function POST(
   { params }: { params: { id: string; fixtureId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId } = params;
+    const paramsObj = await params;
+    const { id: projectId, fixtureId } = paramsObj;
     const userEmail = await getCurrentUserEmail();
     
     // Check if user has permission to create fixtures
@@ -39,21 +42,54 @@ export async function POST(
       return NextResponse.json({ error: 'Fixture not found in this project' }, { status: 404 });
     }
 
+    // Get all fixtures with similar names to check for duplicates
+    const existingFixtures = await prisma.fixture.findMany({
+      where: {
+        projectId,
+        name: {
+          startsWith: sourceFixture.name
+        }
+      }
+    });
+
+    // Determine a unique name for the cloned fixture
+    let newFixtureName = sourceFixture.name;
+    let counter = 1;
+    
+    while (existingFixtures.some(f => f.name === newFixtureName + ` (${counter})`)) {
+      counter++;
+    }
+    
+    newFixtureName = `${sourceFixture.name} (${counter})`;
+    
+    // Create a new exportName based on the fixture name
+    let newExportName = sourceFixture.exportName || '';
+    // If export name is empty or not provided, generate from fixture name
+    if (!newExportName) {
+      newExportName = sourceFixture.name
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '') // Remove special characters
+        .replace(/\s+(.)/g, (_, c) => c.toUpperCase()) // Convert to camelCase
+        .replace(/\s/g, '') // Remove spaces
+        .replace(/^(.)/, (_, c) => c.toLowerCase()); // Ensure first character is lowercase
+    }
+    
+    // Add the counter to the export name
+    newExportName = `${newExportName}${counter}`;
+    
     // Get all steps for the source fixture
     const sourceSteps = await stepRepository.findByFixtureId(fixtureId);
 
     // Use a transaction to ensure all operations succeed or fail together
     const result = await prisma.$transaction(async (tx) => {
-      // Create a new fixture as a clone with " - Copy" appended to the name
+      // Create a new fixture as a clone with the new unique name
       const clonedFixture = await tx.fixture.create({
         data: {
-          name: `${sourceFixture.name} - Copy`,
+          name: newFixtureName,
           type: sourceFixture.type,
           projectId: projectId,
           playwrightScript: sourceFixture.playwrightScript,
-          filename: sourceFixture.filename,
-          exportName: sourceFixture.exportName,
-          fixtureFilePath: sourceFixture.fixtureFilePath,
+          exportName: newExportName,
           createdBy: userEmail || undefined,
           updatedBy: userEmail || undefined,
         },
@@ -83,6 +119,29 @@ export async function POST(
         steps: clonedSteps,
       };
     });
+
+    // Generate the new fixture file with the updated name and exportName
+    try {
+      console.log(`Generating fixture file for cloned fixture ID: ${result.fixture.id}`);
+      const appRoot = process.cwd();
+      
+      // Get the project details
+      const project = await prisma.project.findUnique({
+        where: { id: projectId }
+      });
+      
+      if (project && project.playwrightProjectPath) {
+        const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+        const testManager = new TestManagerService(absoluteProjectPath);
+        await testManager.createFixtureFile(result.fixture.id);
+        console.log(`Fixture file generated successfully for cloned fixture ID: ${result.fixture.id}`);
+      } else {
+        console.error('Project not found or Playwright project path is not set');
+      }
+    } catch (fileError) {
+      console.error('Error generating fixture file:', fileError);
+      // We don't fail the request if file generation fails
+    }
 
     return NextResponse.json({
       success: true,

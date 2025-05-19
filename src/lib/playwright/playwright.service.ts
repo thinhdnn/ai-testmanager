@@ -35,7 +35,16 @@ export class PlaywrightService {
 
   constructor(projectRoot: string) {
     this.projectRoot = projectRoot;
-    this.templatePath = path.join(projectRoot, 'src', 'template');
+    const appRoot = process.cwd();
+    this.templatePath = path.join(appRoot, 'src', 'template');
+    
+    // Register Handlebars helpers globally
+    Handlebars.registerHelper('add', (a, b) => a + b);
+    Handlebars.registerHelper('eq', (a, b) => a === b);
+    Handlebars.registerHelper('any', (array, property, value) => {
+      if (!array) return false;
+      return array.some((item: any) => item[property] === value);
+    });
   }
 
   async createPlaywrightProject(projectId: string, projectName: string): Promise<string> {
@@ -87,6 +96,7 @@ export class PlaywrightService {
       playwrightCode: string;
       expected?: string;
       disabled?: boolean;
+      fixtureId?: string;
     }>;
     tags?: string[];
     outputPath: string;
@@ -98,7 +108,7 @@ export class PlaywrightService {
 
   async generateFixtureFile(params: {
     name: string;
-    type: 'extend' | 'inline';
+    type: 'extend' | 'inline' | 'inlineExtend';
     description?: string;
     exportName: string;
     content: string;

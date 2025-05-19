@@ -3,6 +3,10 @@ import { TestCaseRepository } from '@/lib/db/repositories/test-case-repository';
 import { checkResourcePermission } from '@/lib/rbac/check-permission';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import { PrismaClient } from '@prisma/client';
+import path from 'path';
+
+const prisma = new PrismaClient();
 
 // GET /api/projects/[id]/test-cases/[testCaseId]
 export async function GET(
@@ -105,9 +109,22 @@ export async function PUT(
     if (!updatedTestCase.isManual) {
       try {
         console.log(`Updating test file for test case ID: ${testCaseId}`);
-        const testManager = new TestManagerService(process.cwd());
-        await testManager.createTestFile(testCaseId);
-        console.log(`Test file updated successfully for test case ID: ${testCaseId}`);
+        
+        // Get project information
+        const project = await prisma.project.findUnique({
+          where: { id: projectId }
+        });
+
+        if (project && project.playwrightProjectPath) {
+          // Convert relative path to absolute path
+          const appRoot = process.cwd();
+          const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+          const testManager = new TestManagerService(absoluteProjectPath);
+          await testManager.createTestFile(testCaseId);
+          console.log(`Test file updated successfully for test case ID: ${testCaseId}`);
+        } else {
+          console.error('Project not found or Playwright project path is not set');
+        }
       } catch (fileError) {
         console.error('Error updating test file:', fileError);
         // We don't fail the request if file update fails

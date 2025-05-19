@@ -7,8 +7,8 @@ import { test as base, Page, expect } from '@playwright/test';
  * {{/if}}
  */
 
-{{#if (eq type "data")}}
-// Declare the types of fixtures
+{{!-- ===== TYPE: EXTEND (object with execute method) ===== --}}
+{{#if (eq type "extend")}}
 type {{exportName}} = {
   execute: () => Promise<void>;
 };
@@ -17,7 +17,6 @@ type {{exportName}}Fixtures = {
   {{exportName}}: {{exportName}};
 };
 
-// Extend base test by providing "{{exportName}}"
 export const test = base.extend<{{exportName}}Fixtures>({
   {{exportName}}: async ({ page }: { page: Page }, use) => {
     const {{exportName}}: {{exportName}} = {
@@ -29,29 +28,51 @@ export const test = base.extend<{{exportName}}Fixtures>({
     await use({{exportName}});
   },
 });
-{{else}}
-// Declare the types of fixtures
+
+{{!-- ===== TYPE: EXTENDPAGE (inject page after setup) ===== --}}
+{{else if (eq type "extendPage")}}
 type {{exportName}}Fixtures = {
   {{exportName}}: Page;
 };
 
-// Extend base test by providing "{{exportName}}"
 export const test = base.extend<{{exportName}}Fixtures>({
   {{exportName}}: async ({ page }: { page: Page }, use) => {
-    // Initialize the fixture
-    const {{exportName}}Page = page;
-    
-    // Setup code before using the fixture
+    // Setup logic before exposing page
     async function setup(): Promise<void> {
       {{{content}}}
     }
-    
+
     await setup();
-    
-    // Use the fixture value in the test
-    await use({{exportName}}Page);
+    await use(page);
   },
 });
+
+{{!-- ===== TYPE: INLINE (manual function call) ===== --}}
+{{else if (eq type "inline")}}
+export async function {{exportName}}(page: Page): Promise<void> {
+  {{{content}}}
+}
+
+{{!-- ===== TYPE: INLINEEXTEND (combines inline function with extend pattern) ===== --}}
+{{else if (eq type "inlineExtend")}}
+export async function {{exportName}}(page: Page): Promise<void> {
+  {{{content}}}
+}
+
+type {{exportName}}Fixtures = {
+  {{exportName}}: (page: Page) => Promise<void>;
+};
+
+export const test = base.extend<{{exportName}}Fixtures>({
+  {{exportName}}: async ({}, use) => {
+    await use({{exportName}});
+  },
+});
+
+{{!-- ===== DEFAULT (fallback) ===== --}}
+{{else}}
+// No valid type provided
+console.warn("Unsupported fixture type: '{{type}}'");
 {{/if}}
 
-export { expect } from '@playwright/test'; 
+export { expect } from '@playwright/test';

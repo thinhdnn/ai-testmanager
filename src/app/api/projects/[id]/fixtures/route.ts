@@ -6,6 +6,8 @@ import { getCurrentUserEmail } from '@/lib/auth/session';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth/options';
 import { PrismaClient } from '@prisma/client';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import path from 'path';
 
 const fixtureRepository = new FixtureRepository();
 const fixtureVersionRepository = new FixtureVersionRepository();
@@ -84,8 +86,28 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden - You do not have permission to create fixtures in this project' }, { status: 403 });
     }
 
+    // Get project to get playwright project path
+    const project = await prisma.project.findUnique({
+      where: { id: projectId }
+    });
+
+    if (!project || !project.playwrightProjectPath) {
+      return NextResponse.json(
+        { error: 'Project or Playwright project path not found' },
+        { status: 400 }
+      );
+    }
+
+    // Convert relative project path to absolute path
+    const appRoot = process.cwd();
+    const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+    const testManagerService = new TestManagerService(absoluteProjectPath);
+
     const body = await request.json();
-    const { name, playwrightScript, type, filename, exportName, fixtureFilePath } = body;
+    let { name, type, exportName } = body;
+    
+    // Generate filename automatically from name
+    const filename = `${name.toLowerCase().replace(/\s+/g, '-')}.fixture.ts`;
     
     // Log request body for debugging
     console.log('Creating fixture - request body:', { name, type, exportName, filename });
@@ -115,11 +137,11 @@ export async function POST(
     try {
       const fixture = await fixtureRepository.create({
         name,
-        playwrightScript,
+        playwrightScript: '',
         type,
         filename,
         exportName,
-        fixtureFilePath,
+        fixtureFilePath: undefined, // Will be set by TestManagerService.createFixtureFile()
         projectId,
         createdBy: userEmail,
         updatedBy: userEmail,
@@ -136,6 +158,15 @@ export async function POST(
         playwrightScript: fixture.playwrightScript || undefined,
         createdBy: userEmail
       });
+
+      // Create the fixture TypeScript file
+      try {
+        await testManagerService.createFixtureFile(fixture.id);
+        console.log('Fixture TypeScript file created successfully');
+      } catch (fileError) {
+        console.error('Error creating fixture TypeScript file:', fileError);
+        // Continue anyway, as the fixture is already created in the database
+      }
       
       // Attempt to ensure the current user has view permission on this project
       try {
@@ -145,7 +176,22 @@ export async function POST(
           
           // Find the user
           const user = await prisma.user.findUnique({
-            where: { username: session.user.name }
+            where: { username: session.user.name },
+            include: {
+              roles: {
+                include: {
+                  role: {
+                    include: {
+                      permissions: {
+                        include: {
+                          permission: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           });
           
           if (user) {
@@ -155,31 +201,46 @@ export async function POST(
             });
             
             if (viewPermission) {
-              // Check if permission already exists
-              const existingPermission = await prisma.permissionAssignment.findFirst({
-                where: {
-                  userId: user.id,
-                  permissionId: viewPermission.id,
-                  resourceType: 'project',
-                  resourceId: projectId
-                }
-              });
-              
-              // If no permission exists, create it
-              if (!existingPermission) {
-                await prisma.permissionAssignment.create({
-                  data: {
+              // Check if user already has this permission through their role
+              const hasPermissionThroughRole = user.roles.some(userRole => 
+                userRole.role.permissions.some(rolePerm => 
+                  rolePerm.permission.name === 'project.view'
+                )
+              );
+
+              if (!hasPermissionThroughRole) {
+                // Check if permission assignment already exists
+                const existingPermission = await prisma.permissionAssignment.findFirst({
+                  where: {
                     userId: user.id,
                     permissionId: viewPermission.id,
                     resourceType: 'project',
                     resourceId: projectId
                   }
                 });
-                console.log('Added view permission for user on project');
+                
+                // If no permission exists, create it
+                if (!existingPermission) {
+                  await prisma.permissionAssignment.create({
+                    data: {
+                      userId: user.id,
+                      permissionId: viewPermission.id,
+                      resourceType: 'project',
+                      resourceId: projectId
+                    }
+                  });
+                  console.log('Added view permission for user on project');
+                } else {
+                  console.log('User already has view permission on project');
+                }
               } else {
-                console.log('User already has view permission on project');
+                console.log('User already has view permission through their role');
               }
+            } else {
+              console.log('View permission not found in database');
             }
+          } else {
+            console.log('User not found in database');
           }
         }
       } catch (permError) {

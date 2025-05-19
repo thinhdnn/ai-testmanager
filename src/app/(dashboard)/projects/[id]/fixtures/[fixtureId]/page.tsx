@@ -349,6 +349,23 @@ export default function FixtureDetailPage() {
     try {
       setIsAddingStep(true);
       
+      // Tự động tạo playwrightScript nếu không được cung cấp
+      let playwrightScript = formData.playwrightScript;
+      if (!playwrightScript || playwrightScript.trim() === '') {
+        // Tạo một script mặc định dựa trên action
+        if (formData.action.toLowerCase().includes('click')) {
+          playwrightScript = `await page.click('[data-testid="element"]');`;
+        } else if (formData.action.toLowerCase().includes('fill') || formData.action.toLowerCase().includes('input')) {
+          playwrightScript = `await page.fill('[data-testid="input-field"]', 'value');`;
+        } else if (formData.action.toLowerCase().includes('navigate') || formData.action.toLowerCase().includes('go to')) {
+          playwrightScript = `await page.goto('/path');`;
+        } else if (formData.action.toLowerCase().includes('expect') || formData.action.toLowerCase().includes('verify')) {
+          playwrightScript = `await expect(page.locator('[data-testid="element"]')).toBeVisible();`;
+        } else {
+          playwrightScript = `// Default action for: ${formData.action}\nawait page.waitForTimeout(1000);`;
+        }
+      }
+      
       const response = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/steps`, {
         method: 'POST',
         headers: {
@@ -358,7 +375,7 @@ export default function FixtureDetailPage() {
           action: formData.action,
           data: formData.data || undefined,
           expected: formData.expected || undefined,
-          playwrightScript: formData.playwrightScript || undefined,
+          playwrightScript: playwrightScript,
         }),
       });
       
@@ -466,11 +483,15 @@ export default function FixtureDetailPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <Button
-              variant="outline"
-              onClick={() => router.push(`/projects/${projectId}?tab=fixtures`)}
+              variant="ghost"
+              size="sm"
+              asChild
+              className="flex items-center gap-1"
             >
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back to Fixtures
+              <Link href={`/projects/${projectId}?tab=fixtures`}>
+                <ChevronLeft className="h-4 w-4" />
+                Back to Fixtures
+              </Link>
             </Button>
           </div>
           

@@ -37,7 +37,7 @@ const fixtureFormSchema = z.object({
     .refine(value => !/[<>:"/\\|?*]/.test(value), {
       message: 'Name contains invalid characters for a name',
     }),
-  type: z.enum(['data', 'logic'], {
+  type: z.enum(['extend', 'inline'], {
     required_error: 'Fixture type is required',
   }),
   exportName: z.string()
@@ -47,8 +47,6 @@ const fixtureFormSchema = z.object({
       (value) => !/\d+$/.test(value),
       'Export name should not end with numbers'
     ),
-  playwrightScript: z.string().optional(),
-  filename: z.string().optional(),
 });
 
 type FixtureFormValues = z.infer<typeof fixtureFormSchema>;
@@ -96,27 +94,26 @@ export default function NewFixturePage() {
     resolver: zodResolver(fixtureFormSchema),
     defaultValues: {
       name: '',
-      type: 'data',
+      type: 'extend',
       exportName: '',
-      playwrightScript: '',
-      filename: '',
     },
   });
 
-  // Watch name field to auto-generate exportName and filename
+  // Watch name field to auto-generate exportName
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       if (name === 'name' && value.name) {
         // Auto-generate exportName in camelCase
         form.setValue('exportName', toCamelCase(value.name));
-        
-        // Auto-generate filename
-        const extension = form.getValues('type') === 'data' ? 'json' : 'js';
-        form.setValue('filename', toValidFileName(value.name, extension));
       }
     });
     return () => subscription.unsubscribe();
   }, [form]);
+  
+  // Update type
+  const handleTypeChange = (value: 'extend' | 'inline') => {
+    form.setValue('type', value);
+  };
   
   const onSubmit = async (values: FixtureFormValues) => {
     try {
@@ -250,15 +247,7 @@ export default function NewFixturePage() {
                   <FormItem>
                     <FormLabel>Type</FormLabel>
                     <Select
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        // Update filename extension when type changes
-                        const currentName = form.getValues('name');
-                        if (currentName) {
-                          const extension = value === 'data' ? 'json' : 'js';
-                          form.setValue('filename', toValidFileName(currentName, extension));
-                        }
-                      }}
+                      onValueChange={handleTypeChange}
                       defaultValue={field.value}
                     >
                       <FormControl>
@@ -267,12 +256,12 @@ export default function NewFixturePage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="data">Data</SelectItem>
-                        <SelectItem value="logic">Logic</SelectItem>
+                        <SelectItem value="extend">Extend</SelectItem>
+                        <SelectItem value="inline">Inline</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Data fixtures contain static data. Logic fixtures contain functions.
+                      Extend fixtures extend the base test with new functionality. Inline fixtures contain inline test logic.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

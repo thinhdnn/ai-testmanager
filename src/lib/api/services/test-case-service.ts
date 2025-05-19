@@ -31,10 +31,10 @@ export class TestCaseService {
   }
 
   async getTestCase(projectId: string, testCaseId: string): Promise<TestCase> {
-    const response = await this.apiClient.get<{ testCase: TestCase }>(
+    const response = await this.apiClient.get<TestCase>(
       `/projects/${projectId}/test-cases/${testCaseId}`
     );
-    return response.testCase;
+    return response;
   }
 
   async createTestCase(projectId: string, testCase: Partial<TestCase>): Promise<TestCase> {
@@ -63,11 +63,11 @@ export class TestCaseService {
   }
 
   async updateTestCase(projectId: string, testCaseId: string, testCase: Partial<TestCase>): Promise<TestCase> {
-    const response = await this.apiClient.put<{ testCase: TestCase }>(
+    const response = await this.apiClient.put<TestCase>(
       `/projects/${projectId}/test-cases/${testCaseId}`,
       testCase
     );
-    return response.testCase;
+    return response;
   }
 
   async deleteTestCase(projectId: string, testCaseId: string): Promise<void> {
@@ -84,48 +84,48 @@ export class TestCaseService {
   }
 
   async getTestCaseVersion(projectId: string, testCaseId: string, versionId: string): Promise<TestCaseVersion> {
-    const response = await this.apiClient.get<{ version: TestCaseVersion }>(
+    const response = await this.apiClient.get<TestCaseVersion>(
       `/projects/${projectId}/test-cases/${testCaseId}/versions/${versionId}`
     );
-    return response.version;
+    return response;
   }
 
   async createTestCaseVersion(projectId: string, testCaseId: string, version: Partial<TestCaseVersion>): Promise<TestCaseVersion> {
-    const response = await this.apiClient.post<{ version: TestCaseVersion }>(
+    const response = await this.apiClient.post<TestCaseVersion>(
       `/projects/${projectId}/test-cases/${testCaseId}/versions`,
       version
     );
-    return response.version;
+    return response;
   }
 
   async getTestResults(projectId: string, testCaseId: string): Promise<TestResult[]> {
-    const response = await this.apiClient.get<{ results: TestResult[] }>(
+    const response = await this.apiClient.get<TestResult[]>(
       `/projects/${projectId}/test-cases/${testCaseId}/results`
     );
-    return response.results;
+    return response;
   }
 
   async getTestCaseSteps(projectId: string, testCaseId: string): Promise<Step[]> {
-    const response = await this.apiClient.get<{ steps: Step[] }>(
+    const response = await this.apiClient.get<Step[]>(
       `/projects/${projectId}/test-cases/${testCaseId}/steps`
     );
-    return response.steps;
+    return response;
   }
 
   async createTestCaseStep(projectId: string, testCaseId: string, step: Partial<Step>): Promise<Step> {
-    const response = await this.apiClient.post<{ step: Step }>(
+    const response = await this.apiClient.post<Step>(
       `/projects/${projectId}/test-cases/${testCaseId}/steps`,
       step
     );
-    return response.step;
+    return response;
   }
 
   async updateTestCaseStep(projectId: string, testCaseId: string, stepId: string, step: Partial<Step>): Promise<Step> {
-    const response = await this.apiClient.put<{ step: Step }>(
+    const response = await this.apiClient.put<Step>(
       `/projects/${projectId}/test-cases/${testCaseId}/steps/${stepId}`,
       step
     );
-    return response.step;
+    return response;
   }
 
   async deleteTestCaseStep(projectId: string, testCaseId: string, stepId: string): Promise<void> {
@@ -135,35 +135,35 @@ export class TestCaseService {
   }
 
   async moveTestCaseStep(projectId: string, testCaseId: string, stepId: string, order: number): Promise<Step> {
-    const response = await this.apiClient.post<{ step: Step }>(
+    const response = await this.apiClient.post<Step>(
       `/projects/${projectId}/test-cases/${testCaseId}/steps/reorder`,
       { stepId, newOrder: order }
     );
-    return response.step;
+    return response;
   }
 
   async duplicateTestCaseStep(projectId: string, testCaseId: string, stepId: string): Promise<Step> {
-    const response = await this.apiClient.post<{ step: Step }>(
+    const response = await this.apiClient.post<Step>(
       `/projects/${projectId}/test-cases/${testCaseId}/steps/duplicate/${stepId}`,
       {}
     );
-    return response.step;
+    return response;
   }
 
   async revertTestCase(projectId: string, testCaseId: string, versionId: string): Promise<TestCase> {
-    const response = await this.apiClient.post<{ testCase: TestCase }>(
+    const response = await this.apiClient.post<TestCase>(
       `/projects/${projectId}/test-cases/${testCaseId}/revert/${versionId}`,
       { projectId }
     );
-    return response.testCase;
+    return response;
   }
 
   async cloneTestCase(projectId: string, testCaseId: string): Promise<TestCase> {
-    const response = await this.apiClient.post<{ testCase: TestCase }>(
+    const response = await this.apiClient.post<TestCase>(
       `/projects/${projectId}/test-cases/${testCaseId}/clone`,
       {}
     );
-    return response.testCase;
+    return response;
   }
 
   async getProjectTags(projectId: string): Promise<any[]> {

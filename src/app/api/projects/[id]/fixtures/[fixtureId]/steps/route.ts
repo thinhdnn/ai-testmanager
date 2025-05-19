@@ -8,6 +8,11 @@ import { getServerSession } from 'next-auth/next';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { incrementVersion } from '@/lib/utils/version';
 import { StepVersionRepository } from '@/lib/db/repositories/step-version-repository';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import path from 'path';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // GET /api/projects/[id]/fixtures/[fixtureId]/steps
 export async function GET(
@@ -15,7 +20,8 @@ export async function GET(
   { params }: { params: { id: string; fixtureId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId } = params;
+    const resolvedParams = await params;
+    const { id: projectId, fixtureId } = resolvedParams;
     
     // Log parameters for debugging
     console.log('GET fixture steps - params:', { projectId, fixtureId });
@@ -69,7 +75,8 @@ export async function POST(
   { params }: { params: { id: string; fixtureId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId } = params;
+    const resolvedParams = await params;
+    const { id: projectId, fixtureId } = resolvedParams;
     const userEmail = await getCurrentUserEmail();
     
     // Check if user has permission to update fixture
@@ -84,7 +91,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { action, data, expected, playwrightScript } = body;
+    const { action, data, expected, playwrightScript, disabled } = body;
 
     // Validate required fields
     if (!action) {
@@ -128,8 +135,9 @@ export async function POST(
       action,
       data,
       expected,
-      playwrightScript,
+      playwrightScript: playwrightScript || '',
       order: nextOrder,
+      disabled: disabled || false,
       createdBy: userEmail,
       updatedBy: userEmail
     });
@@ -170,6 +178,29 @@ export async function POST(
     await fixtureRepository.update(fixtureId, {
       updatedBy: userEmail
     });
+
+    // Regenerate the fixture file
+    try {
+      console.log(`Updating fixture file for fixture ID: ${fixtureId}`);
+      const appRoot = process.cwd();
+      
+      // Get the project details
+      const project = await prisma.project.findUnique({
+        where: { id: projectId }
+      });
+      
+      if (project && project.playwrightProjectPath) {
+        const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+        const testManager = new TestManagerService(absoluteProjectPath);
+        await testManager.createFixtureFile(fixtureId);
+        console.log(`Fixture file updated successfully for fixture ID: ${fixtureId}`);
+      } else {
+        console.error('Project not found or Playwright project path is not set');
+      }
+    } catch (fileError) {
+      console.error('Error updating fixture file:', fileError);
+      // We don't fail the request if file update fails
+    }
 
     return NextResponse.json(step, { status: 201 });
   } catch (error) {

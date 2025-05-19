@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TestCaseRepository } from '@/lib/db/repositories/test-case-repository';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import { PrismaClient } from '@prisma/client';
+import path from 'path';
+
+const prisma = new PrismaClient();
 
 // GET /api/projects/[id]/test-cases
 export async function GET(
@@ -62,9 +66,22 @@ export async function POST(
     if (!testCase.isManual) {
       try {
         console.log(`Creating test file for test case ID: ${testCase.id}`);
-        const testManager = new TestManagerService(process.cwd());
-        await testManager.createTestFile(testCase.id);
-        console.log(`Test file created successfully for test case ID: ${testCase.id}`);
+        
+        // Get project information
+        const project = await prisma.project.findUnique({
+          where: { id: projectId }
+        });
+
+        if (project && project.playwrightProjectPath) {
+          // Convert relative path to absolute path
+          const appRoot = process.cwd();
+          const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+          const testManager = new TestManagerService(absoluteProjectPath);
+          await testManager.createTestFile(testCase.id);
+          console.log(`Test file created successfully for test case ID: ${testCase.id}`);
+        } else {
+          console.error('Project not found or Playwright project path is not set');
+        }
       } catch (fileError) {
         console.error('Error creating test file:', fileError);
         // We don't fail the request if file creation fails

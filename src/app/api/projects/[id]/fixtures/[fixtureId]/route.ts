@@ -7,13 +7,29 @@ import { getCurrentUserEmail } from '@/lib/auth/session';
 import { getServerSession } from 'next-auth/next';
 import { incrementVersion } from '@/lib/utils/version';
 import { StepRepository } from '@/lib/db/repositories/step-repository';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import path from 'path';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+// Function to convert a string to camelCase
+function toCamelCase(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '') // Remove special characters
+    .replace(/\s+(.)/g, (_, c) => c.toUpperCase()) // Convert to camelCase
+    .replace(/\s/g, '') // Remove spaces
+    .replace(/^(.)/, (_, c) => c.toLowerCase()); // Ensure first character is lowercase
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string; fixtureId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId } = params;
+    const resolvedParams = await params;
+    const { id: projectId, fixtureId } = resolvedParams;
     
     // Log parameters for debugging
     console.log('GET fixture - params:', { projectId, fixtureId });
@@ -74,7 +90,8 @@ export async function PUT(
   { params }: { params: { id: string; fixtureId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId } = params;
+    const resolvedParams = await params;
+    const { id: projectId, fixtureId } = resolvedParams;
     const userEmail = await getCurrentUserEmail();
     
     const hasPermission = await checkResourcePermission('project', 'update', projectId);
@@ -111,6 +128,17 @@ export async function PUT(
         { status: 400 }
       );
     }
+    
+    // Check if name has changed - if so, we'll need to rename the fixture file
+    const hasNameChanged = fixture.name !== name;
+    
+    // If name has changed, auto-update the exportName to camelCase of the new name
+    // unless exportName was explicitly provided
+    let updatedExportName = exportName;
+    if (hasNameChanged && (!exportName || exportName === fixture.exportName)) {
+      updatedExportName = toCamelCase(name);
+      console.log(`Auto-updating exportName from ${fixture.exportName} to ${updatedExportName} based on new name`);
+    }
 
     // Get the latest version to determine next version number
     const latestVersion = await fixtureVersionRepository.findLatestByFixtureId(fixtureId);
@@ -129,16 +157,48 @@ export async function PUT(
       createdBy: userEmail
     });
 
-    // Update the fixture
+    // Update the fixture in database
     const updatedFixture = await fixtureRepository.update(fixtureId, {
       name,
       type,
-      exportName,
-      playwrightScript: body.playwrightScript,
-      filename: body.filename,
-      fixtureFilePath: body.fixtureFilePath,
+      exportName: updatedExportName,
+      playwrightScript: '',
+      // Don't update fixtureFilePath here if name has changed - we'll do it after renaming the file
+      fixtureFilePath: hasNameChanged ? fixture.fixtureFilePath : body.fixtureFilePath,
       updatedBy: userEmail,
     });
+
+    // If name has changed, rename the fixture file
+    if (hasNameChanged && fixture.fixtureFilePath) {
+      try {
+        // Get the project's Playwright directory path
+        const project = await prisma.project.findUnique({
+          where: { id: projectId }
+        });
+        
+        if (!project || !project.playwrightProjectPath) {
+          throw new Error('Project or Playwright project path not found');
+        }
+        
+        // Convert relative project path to absolute path
+        const appRoot = process.cwd();
+        const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+        
+        // Initialize TestManagerService with project root path
+        const testManagerService = new TestManagerService(absoluteProjectPath);
+        
+        // Rename the fixture file
+        const newFilePath = await testManagerService.renameFixtureFile(fixtureId, fixture.name, name);
+        
+        if (newFilePath) {
+          // Update fixtureFilePath in response object for client
+          updatedFixture.fixtureFilePath = newFilePath;
+        }
+      } catch (error) {
+        console.error('Error renaming fixture file:', error);
+        // Continue anyway, as the fixture data is already updated in the database
+      }
+    }
 
     return NextResponse.json(updatedFixture, { status: 200 });
   } catch (error) {
@@ -155,7 +215,8 @@ export async function DELETE(
   { params }: { params: { id: string; fixtureId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId } = params;
+    const resolvedParams = await params;
+    const { id: projectId, fixtureId } = resolvedParams;
     
     // Check permission
     const hasPermission = await checkResourcePermission('project', 'update', projectId);

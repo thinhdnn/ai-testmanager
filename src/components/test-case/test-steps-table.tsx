@@ -213,7 +213,7 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
           data: formData.data || undefined,
           expected: formData.expected || undefined,
           fixtureId: formData.fixtureId || undefined,
-          playwrightScript: formData.playwrightScript || undefined,
+          playwrightScript: '', // Always use empty string for fixture steps
         });
       } else {
         const response = await testCaseService.createTestCaseStep(projectId, testCaseId, {
@@ -276,7 +276,7 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
             data: formData.data || undefined,
             expected: formData.expected || undefined,
             fixtureId: formData.fixtureId || undefined,
-            playwrightScript: formData.playwrightScript || undefined,
+            playwrightScript: '', // Always use empty string for fixture steps
             disabled: activeStep.disabled,
             order: activeStep.order,
           }
@@ -861,36 +861,39 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
               />
             </div>
 
-            <div className="border border-border rounded-md">
-              <Button
-                type="button"
-                variant="ghost"
-                className="flex w-full justify-between p-3 font-medium"
-                onClick={() => setShowPlaywrightAdd(!showPlaywrightAdd)}
-              >
-                <div className="flex items-center gap-2">
-                  <Code className="h-4 w-4" />
-                  <span>Playwright Script</span>
-                </div>
-                <ChevronRight className={`h-4 w-4 transition-transform ${showPlaywrightAdd ? 'rotate-90' : ''}`} />
-              </Button>
-              
-              {showPlaywrightAdd && (
-                <div className="p-3 pt-0">
-                  <Textarea
-                    id="playwright-script"
-                    placeholder="await page.click('.login-button');"
-                    value={formData.playwrightScript}
-                    onChange={(e) => setFormData({ ...formData, playwrightScript: e.target.value })}
-                    rows={5}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter Playwright automation code for this step
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* Only show Playwright Script for test cases, not fixtures */}
+            {!isFixture && (
+              <div className="border border-border rounded-md">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex w-full justify-between p-3 font-medium"
+                  onClick={() => setShowPlaywrightAdd(!showPlaywrightAdd)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Code className="h-4 w-4" />
+                    <span>Playwright Script</span>
+                  </div>
+                  <ChevronRight className={`h-4 w-4 transition-transform ${showPlaywrightAdd ? 'rotate-90' : ''}`} />
+                </Button>
+                
+                {showPlaywrightAdd && (
+                  <div className="p-3 pt-0">
+                    <Textarea
+                      id="playwright-script"
+                      placeholder="await page.click('.login-button');"
+                      value={formData.playwrightScript}
+                      onChange={(e) => setFormData({ ...formData, playwrightScript: e.target.value })}
+                      rows={5}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Enter Playwright automation code for this step
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <DialogFooter>
@@ -997,36 +1000,39 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
               />
             </div>
 
-            <div className="border border-border rounded-md">
-              <Button
-                type="button"
-                variant="ghost"
-                className="flex w-full justify-between p-3 font-medium"
-                onClick={() => setShowPlaywrightEdit(!showPlaywrightEdit)}
-              >
-                <div className="flex items-center gap-2">
-                  <Code className="h-4 w-4" />
-                  <span>Playwright Script</span>
-                </div>
-                <ChevronRight className={`h-4 w-4 transition-transform ${showPlaywrightEdit ? 'rotate-90' : ''}`} />
-              </Button>
-              
-              {showPlaywrightEdit && (
-                <div className="p-3 pt-0">
-                  <Textarea
-                    id="edit-playwright-script"
-                    placeholder="await page.click('.login-button');"
-                    value={formData.playwrightScript}
-                    onChange={(e) => setFormData({ ...formData, playwrightScript: e.target.value })}
-                    rows={5}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter Playwright automation code for this step
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* Only show Playwright Script for test cases, not fixtures */}
+            {!isFixture && (
+              <div className="border border-border rounded-md">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex w-full justify-between p-3 font-medium"
+                  onClick={() => setShowPlaywrightEdit(!showPlaywrightEdit)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Code className="h-4 w-4" />
+                    <span>Playwright Script</span>
+                  </div>
+                  <ChevronRight className={`h-4 w-4 transition-transform ${showPlaywrightEdit ? 'rotate-90' : ''}`} />
+                </Button>
+                
+                {showPlaywrightEdit && (
+                  <div className="p-3 pt-0">
+                    <Textarea
+                      id="edit-playwright-script"
+                      placeholder="await page.click('.login-button');"
+                      value={formData.playwrightScript}
+                      onChange={(e) => setFormData({ ...formData, playwrightScript: e.target.value })}
+                      rows={5}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Enter Playwright automation code for this step
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <DialogFooter>

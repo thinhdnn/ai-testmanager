@@ -9,7 +9,8 @@ export async function GET(
   { params }: { params: { id: string; fixtureId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId } = params;
+    const resolvedParams = await params;
+    const { id: projectId, fixtureId } = resolvedParams;
     
     // Check permission
     const hasPermission = await checkResourcePermission('project', 'view', projectId);

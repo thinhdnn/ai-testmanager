@@ -8,6 +8,11 @@ import { checkResourcePermission } from '@/lib/rbac/check-permission';
 import { getServerSession } from 'next-auth/next';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { incrementVersion } from '@/lib/utils/version';
+import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import path from 'path';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // GET endpoint for a specific fixture step
 export async function GET(
@@ -15,7 +20,8 @@ export async function GET(
   { params }: { params: { id: string; fixtureId: string; stepId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId, stepId } = params;
+    const paramsObj = await params;
+    const { id: projectId, fixtureId, stepId } = paramsObj;
     
     // Check permission
     const hasPermission = await checkResourcePermission('project', 'view', projectId);
@@ -65,7 +71,8 @@ export async function PUT(
   { params }: { params: { id: string; fixtureId: string; stepId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId, stepId } = params;
+    const paramsObj = await params;
+    const { id: projectId, fixtureId, stepId } = paramsObj;
     const userEmail = await getCurrentUserEmail();
     
     // Check permission
@@ -112,15 +119,18 @@ export async function PUT(
       );
     }
     
-    const updatedStep = await stepRepository.update(stepId, {
+    // Prepare update data
+    const updateData = {
       action,
       data,
       expected,
       order,
-      disabled,
-      playwrightScript,
+      disabled: disabled || false,
+      playwrightScript: playwrightScript || '', // Ensure playwrightScript is never undefined
       updatedBy: userEmail
-    });
+    };
+    
+    const updatedStep = await stepRepository.update(stepId, updateData);
     
     // Create a new version for the fixture
     const fixtureVersionRepository = new FixtureVersionRepository();
@@ -160,6 +170,29 @@ export async function PUT(
       updatedBy: userEmail
     });
     
+    // Regenerate the fixture file
+    try {
+      console.log(`Updating fixture file for fixture ID: ${fixtureId}`);
+      const appRoot = process.cwd();
+      
+      // Get the project details
+      const project = await prisma.project.findUnique({
+        where: { id: projectId }
+      });
+      
+      if (project && project.playwrightProjectPath) {
+        const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+        const testManager = new TestManagerService(absoluteProjectPath);
+        await testManager.createFixtureFile(fixtureId);
+        console.log(`Fixture file updated successfully for fixture ID: ${fixtureId}`);
+      } else {
+        console.error('Project not found or Playwright project path is not set');
+      }
+    } catch (fileError) {
+      console.error('Error updating fixture file:', fileError);
+      // We don't fail the request if file update fails
+    }
+    
     return NextResponse.json({ 
       step: updatedStep,
       version: newVersionNumber 
@@ -179,7 +212,8 @@ export async function DELETE(
   { params }: { params: { id: string; fixtureId: string; stepId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId, stepId } = params;
+    const paramsObj = await params;
+    const { id: projectId, fixtureId, stepId } = paramsObj;
     const userEmail = await getCurrentUserEmail();
     
     console.log('DELETE fixture step - params:', { projectId, fixtureId, stepId });
@@ -256,6 +290,29 @@ export async function DELETE(
     await fixtureRepository.update(fixtureId, {
       updatedBy: userEmail
     });
+    
+    // Regenerate the fixture file
+    try {
+      console.log(`Updating fixture file for fixture ID: ${fixtureId} after step deletion`);
+      const appRoot = process.cwd();
+      
+      // Get the project details
+      const project = await prisma.project.findUnique({
+        where: { id: projectId }
+      });
+      
+      if (project && project.playwrightProjectPath) {
+        const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+        const testManager = new TestManagerService(absoluteProjectPath);
+        await testManager.createFixtureFile(fixtureId);
+        console.log(`Fixture file updated successfully for fixture ID: ${fixtureId}`);
+      } else {
+        console.error('Project not found or Playwright project path is not set');
+      }
+    } catch (fileError) {
+      console.error('Error updating fixture file:', fileError);
+      // We don't fail the request if file update fails
+    }
     
     return NextResponse.json({ 
       success: true,
