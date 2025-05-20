@@ -1,4 +1,4 @@
-import { test as base, Page, expect } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 
 /**
  * {{name}} {{type}} fixture
@@ -7,45 +7,27 @@ import { test as base, Page, expect } from '@playwright/test';
  * {{/if}}
  */
 
-{{!-- ===== TYPE: EXTEND (object with execute method) ===== --}}
+{{!-- ===== TYPE: EXTEND (auto-run logic when fixture injected) ===== --}}
 {{#if (eq type "extend")}}
-type {{exportName}} = {
-  execute: () => Promise<void>;
-};
-
-type {{exportName}}Fixtures = {
-  {{exportName}}: {{exportName}};
-};
-
-export const test = base.extend<{{exportName}}Fixtures>({
+export const {{exportName}}Fixture = {
   {{exportName}}: async ({ page }: { page: Page }, use) => {
-    const {{exportName}}: {{exportName}} = {
-      execute: async () => {
-        {{{content}}}
-      },
-    };
-
-    await use({{exportName}});
-  },
-});
+    {{{content}}}
+    await use(true);
+  }
+};
 
 {{!-- ===== TYPE: EXTENDPAGE (inject page after setup) ===== --}}
 {{else if (eq type "extendPage")}}
-type {{exportName}}Fixtures = {
-  {{exportName}}: Page;
-};
-
-export const test = base.extend<{{exportName}}Fixtures>({
+export const {{exportName}}Fixture = {
   {{exportName}}: async ({ page }: { page: Page }, use) => {
-    // Setup logic before exposing page
     async function setup(): Promise<void> {
       {{{content}}}
     }
 
     await setup();
     await use(page);
-  },
-});
+  }
+};
 
 {{!-- ===== TYPE: INLINE (manual function call) ===== --}}
 {{else if (eq type "inline")}}
@@ -59,15 +41,11 @@ export async function {{exportName}}(page: Page): Promise<void> {
   {{{content}}}
 }
 
-type {{exportName}}Fixtures = {
-  {{exportName}}: (page: Page) => Promise<void>;
-};
-
-export const test = base.extend<{{exportName}}Fixtures>({
+export const {{exportName}}Fixture = {
   {{exportName}}: async ({}, use) => {
     await use({{exportName}});
-  },
-});
+  }
+};
 
 {{!-- ===== DEFAULT (fallback) ===== --}}
 {{else}}
@@ -75,4 +53,4 @@ export const test = base.extend<{{exportName}}Fixtures>({
 console.warn("Unsupported fixture type: '{{type}}'");
 {{/if}}
 
-export { expect } from '@playwright/test';
+export { expect };

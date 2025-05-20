@@ -70,6 +70,10 @@ export class PlaywrightService {
       // Create new folders
       await fs.mkdir(path.join(projectPath, 'fixtures'), { recursive: true });
       await fs.mkdir(path.join(projectPath, 'tests'), { recursive: true });
+      
+      // Create index.ts in fixtures folder
+      const fixturesIndexPath = path.join(projectPath, 'fixtures', 'index.ts');
+      await fs.writeFile(fixturesIndexPath, '// Fixtures export file\n', 'utf8');
 
       return projectPath;
     } catch (error: any) {
@@ -117,5 +121,32 @@ export class PlaywrightService {
     const template = await this.loadTemplate('fixture');
     const content = template(params);
     await fs.writeFile(params.outputPath, content, 'utf-8');
+    
+    // Add fixture export to index.ts
+    const fixturesDir = path.dirname(params.outputPath);
+    const indexPath = path.join(fixturesDir, 'index.ts');
+    
+    try {
+      // Check if index.ts exists, create it if not
+      try {
+        await fs.access(indexPath);
+      } catch {
+        await fs.writeFile(indexPath, '// Fixtures export file\n', 'utf8');
+      }
+      
+      // Read current content
+      const indexContent = await fs.readFile(indexPath, 'utf8');
+      
+      // Generate export statement
+      const relativePath = `./${path.basename(params.outputPath, '.ts')}`;
+      const exportLine = `export { test as ${params.exportName} } from '${relativePath}';\n`;
+      
+      // Add export if it doesn't exist already
+      if (!indexContent.includes(exportLine)) {
+        await fs.writeFile(indexPath, indexContent + exportLine, 'utf8');
+      }
+    } catch (error: any) {
+      console.warn(`Warning: Could not update index.ts: ${error.message}`);
+    }
   }
 } 

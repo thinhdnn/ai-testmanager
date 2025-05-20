@@ -8,7 +8,6 @@ import { {{name}} } from '{{path}}';
 {{/if}}
 
 {{!-- Extend fixtures if any use mode = "extend" --}}
-{{#if fixtures}}
 {{#if (any fixtures "mode" "extend")}}
 const test = base.extend({
   {{#each fixtures}}
@@ -17,9 +16,6 @@ const test = base.extend({
   {{/if}}
   {{/each}}
 });
-{{else}}
-const test = base;
-{{/if}}
 {{else}}
 const test = base;
 {{/if}}
@@ -32,13 +28,6 @@ test('{{testCaseName}}', {
 {{else}}
 test('{{testCaseName}}', async ({{#if (any fixtures "mode" "extend")}}{ page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }{{else}}{ page }{{/if}}) => {
 {{/if}}
-
-  // Inline Fixtures
-  {{#each fixtures}}
-  {{#if (eq mode "inline")}}
-  await {{name}}(page);
-  {{/if}}
-  {{/each}}
 
   // Test Steps
   {{#each steps}}
