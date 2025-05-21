@@ -5,31 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-
-interface ProjectConfigFormProps {
-  projectId: string;
-}
-
-interface ConfigurationSettings {
-  playwright?: {
-    timeout?: string;
-    expectTimeout?: string;
-    retries?: string;
-    workers?: string;
-    fullyParallel?: string;
-  };
-  browser?: {
-    baseURL?: string;
-    headless?: string;
-    'viewport.width'?: string;
-    'viewport.height'?: string;
-    locale?: string;
-    timezoneId?: string;
-    video?: string;
-    screenshot?: string;
-    trace?: string;
-  };
-}
+import { ProjectConfigFormProps, ConfigurationSettings } from '@/types/project';
+import { ProjectService } from '@/lib/api/services';
 
 export function ProjectConfigForm({ projectId }: ProjectConfigFormProps) {
   const [config, setConfig] = useState<ConfigurationSettings>({
@@ -54,15 +31,13 @@ export function ProjectConfigForm({ projectId }: ProjectConfigFormProps) {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const projectService = new ProjectService();
 
   useEffect(() => {
     async function loadConfig() {
       try {
-        const response = await fetch(`/api/projects/${projectId}/configuration`);
-        if (response.ok) {
-          const data = await response.json();
-          setConfig(data);
-        }
+        const data = await projectService.getProjectConfiguration(projectId);
+        setConfig(data);
       } catch (error) {
         console.error('Error loading configuration:', error);
         toast.error('Failed to load configuration');
@@ -79,16 +54,7 @@ export function ProjectConfigForm({ projectId }: ProjectConfigFormProps) {
     setSaving(true);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/configuration`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save configuration');
-      }
-
+      await projectService.updateProjectConfiguration(projectId, config);
       toast.success('Configuration saved successfully');
     } catch (error) {
       console.error('Error saving configuration:', error);

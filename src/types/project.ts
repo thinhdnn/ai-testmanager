@@ -24,8 +24,27 @@ export interface PaginationData {
   totalPages: number;
 }
 
+export interface ProjectConfigFormProps {
+  projectId: string;
+}
+
 export interface ConfigurationSettings {
-  [category: string]: {
-    [key: string]: string;
+  playwright?: {
+    timeout?: string;
+    expectTimeout?: string;
+    retries?: string;
+    workers?: string;
+    fullyParallel?: string;
+  };
+  browser?: {
+    baseURL?: string;
+    headless?: string;
+    'viewport.width'?: string;
+    'viewport.height'?: string;
+    locale?: string;
+    timezoneId?: string;
+    video?: string;
+    screenshot?: string;
+    trace?: string;
   };
 } 

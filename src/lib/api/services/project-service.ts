@@ -1,29 +1,9 @@
 import { ApiClient } from '../api-client';
 import { Project, ProjectListResponse } from '../interfaces';
 import { getProjectApiUrl } from '@/lib/api-utils';
+import { ConfigurationSettings } from '@/types/project';
 
 const apiClient = ApiClient.getInstance();
-
-export interface ConfigurationSettings {
-  playwright?: {
-    timeout?: string;
-    expectTimeout?: string;
-    retries?: string;
-    workers?: string;
-    fullyParallel?: string;
-  };
-  browser?: {
-    baseURL?: string;
-    headless?: string;
-    'viewport.width'?: string;
-    'viewport.height'?: string;
-    locale?: string;
-    timezoneId?: string;
-    video?: string;
-    screenshot?: string;
-    trace?: string;
-  };
-}
 
 export class ProjectService {
   async getProjects(params?: {
