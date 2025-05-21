@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Edit, Trash2, ArrowLeft, PlusCircle } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, PlusCircle, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { TestCaseTable } from '@/components/test-case/test-case-table';
 import { FixtureTable } from '@/components/fixture/fixture-table';
 import { formatDate } from '@/lib/utils/date';
 import { ProjectConfigForm } from '@/components/project/project-config-form';
+import { RunTestDialog } from '@/components/test-case/run-test-dialog';
 
 interface Project {
   id: string;
@@ -34,6 +35,9 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [isRunTestDialogOpen, setIsRunTestDialogOpen] = useState(false);
+  const [selectedTestCases, setSelectedTestCases] = useState<string[]>([]);
+  const [runMode, setRunMode] = useState<'list' | 'project'>('project');
 
   // Load initial active tab from localStorage or URL
   useEffect(() => {
@@ -148,6 +152,19 @@ export default function ProjectDetailPage() {
     }
   }
 
+  // Function to handle running selected test cases
+  const handleRunSelectedTests = (testCaseIds: string[]) => {
+    setSelectedTestCases(testCaseIds);
+    setRunMode('list');
+    setIsRunTestDialogOpen(true);
+  };
+
+  // Function to handle running the entire project
+  const handleRunProject = () => {
+    setRunMode('project');
+    setIsRunTestDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[70vh]">
@@ -190,6 +207,14 @@ export default function ProjectDetailPage() {
               <Edit className="mr-2 h-4 w-4" />
               Edit
             </Link>
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleRunProject}
+          >
+            <Play className="mr-2 h-4 w-4" />
+            Run All Tests
           </Button>
           <Button 
             variant="destructive" 
@@ -310,26 +335,42 @@ export default function ProjectDetailPage() {
               </Button>
             </div>
           ) : (
-            <TestCaseTable
-              testCases={project.testCases.map(testCase => ({
-                ...testCase,
-                tags: testCase.tags || null,
-                lastRun: testCase.lastRun || null,
-                _count: testCase._count || { Steps: 0 }
-              }))}
-              projectId={project.id}
-              pagination={{
-                page: 1,
-                limit: project.testCases.length,
-                totalItems: project.testCases.length,
-                totalPages: 1
-              }}
-              filters={{
-                search: '',
-                status: '',
-                tags: []
-              }}
-            />
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const allTestCaseIds = project.testCases.map(tc => tc.id);
+                    handleRunSelectedTests(allTestCaseIds);
+                  }}
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  Run All Test Cases
+                </Button>
+              </div>
+              <TestCaseTable
+                testCases={project.testCases.map(testCase => ({
+                  ...testCase,
+                  tags: testCase.tags || null,
+                  lastRun: testCase.lastRun || null,
+                  _count: testCase._count || { Steps: 0 }
+                }))}
+                projectId={project.id}
+                pagination={{
+                  page: 1,
+                  limit: project.testCases.length,
+                  totalItems: project.testCases.length,
+                  totalPages: 1
+                }}
+                filters={{
+                  search: '',
+                  status: '',
+                  tags: []
+                }}
+                onRunSelected={handleRunSelectedTests}
+              />
+            </div>
           )}
         </TabsContent>
         
@@ -418,6 +459,15 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
       </Tabs>
+      
+      {/* Run Test Dialog */}
+      <RunTestDialog
+        isOpen={isRunTestDialogOpen}
+        onClose={() => setIsRunTestDialogOpen(false)}
+        projectId={project?.id || ''}
+        mode={runMode}
+        testCaseIds={selectedTestCases}
+      />
     </div>
   );
 }

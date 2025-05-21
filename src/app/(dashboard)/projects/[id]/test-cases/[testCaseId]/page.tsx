@@ -36,6 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { RunTestDialog } from '@/components/test-case/run-test-dialog';
 
 interface Props {
   params: {
@@ -122,6 +123,7 @@ export default function TestCaseDetailPage() {
   const [versionSteps, setVersionSteps] = useState<StepVersion[]>([]);
   const [isReverting, setIsReverting] = useState(false);
   const [activeTab, setActiveTab] = useState('steps');
+  const [isRunTestDialogOpen, setIsRunTestDialogOpen] = useState(false);
   
   const refreshTestCaseData = async () => {
     try {
@@ -403,7 +405,11 @@ export default function TestCaseDetailPage() {
                 <Copy className="mr-2 h-4 w-4" />
                 Clone
               </Button>
-              <Button variant="default" size="sm">
+              <Button 
+                variant="default" 
+                size="sm"
+                onClick={() => setIsRunTestDialogOpen(true)}
+              >
                 <Play className="mr-2 h-4 w-4" />
                 Run Test
               </Button>
@@ -651,6 +657,15 @@ export default function TestCaseDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Run Test Dialog */}
+      <RunTestDialog 
+        isOpen={isRunTestDialogOpen}
+        onClose={() => setIsRunTestDialogOpen(false)}
+        projectId={projectId}
+        mode="file"
+        testCaseId={testCaseId}
+      />
     </div>
   );
 } 

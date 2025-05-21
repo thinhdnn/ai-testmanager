@@ -28,6 +28,7 @@ export interface TestCase {
   version: number;
   isManual: boolean;
   tags: string[];
+  testFilePath?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -107,12 +108,17 @@ export interface StepVersion {
 export interface TestResult {
   id: string;
   testCaseId: string;
+  projectId: string;
   status: string;
   success: boolean;
   executionTime: number;
   error?: string;
+  errorMessage?: string;
+  output?: string;
+  resultData?: string;
+  videoUrl?: string;
   screenshot?: string;
-  video?: string;
+  browser?: string;
   createdAt: string;
   createdBy: string;
 }

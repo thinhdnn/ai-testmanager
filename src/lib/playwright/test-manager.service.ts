@@ -12,7 +12,16 @@ export class TestManagerService {
     this.playwrightService = new PlaywrightService(projectRoot);
   }
 
-  async createTestFile(testCaseId: string): Promise<void> {
+  // Helper function to slugify a name for file naming
+  private slugify(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
+      .replace(/^-|-$/g, '')       // Remove leading/trailing hyphens
+      || 'test';                   // Fallback if name is empty after processing
+  }
+
+  async createTestFile(testCaseId: string, useIdAsFilename: boolean = false): Promise<void> {
     const testCase = await this.prisma.testCase.findUnique({
       where: { id: testCaseId },
       include: {
@@ -33,17 +42,25 @@ export class TestManagerService {
     const appRoot = process.cwd();
     const absoluteProjectPath = path.join(appRoot, testCase.project.playwrightProjectPath);
     
+    // Create filename based on settings
+    let filename;
+    if (useIdAsFilename) {
+      filename = `${testCaseId}.spec.ts`;
+    } else {
+      filename = `${this.slugify(testCase.name)}.spec.ts`;
+    }
+    
     // Create absolute path for writing the file
     const absoluteTestFilePath = path.join(
       absoluteProjectPath,
       'tests',
-      `${testCase.name.toLowerCase().replace(/\s+/g, '-')}.spec.ts`
+      filename
     );
     
     // Create relative path for storing in database
     const relativeTestFilePath = path.join(
       'tests',
-      `${testCase.name.toLowerCase().replace(/\s+/g, '-')}.spec.ts`
+      filename
     );
     
     // Kiểm tra xem tên file có thay đổi hay không

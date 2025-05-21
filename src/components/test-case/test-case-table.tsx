@@ -52,6 +52,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/utils/date';
 import { Edit, Play, MoreHorizontal, Copy, Trash, Search, X, ArrowUpDown, ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
@@ -93,9 +94,16 @@ interface TestCaseTableProps {
     status: string;
     tags: string[];
   };
+  onRunSelected?: (testCaseIds: string[]) => void;
 }
 
-export function TestCaseTable({ testCases = [], projectId, pagination, filters }: TestCaseTableProps) {
+export function TestCaseTable({ 
+  testCases = [], 
+  projectId, 
+  pagination, 
+  filters,
+  onRunSelected 
+}: TestCaseTableProps) {
   const router = useRouter();
   
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
@@ -103,6 +111,7 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
   const [tagsFilter, setTagsFilter] = useState<string[]>(filters.tags || []);
   const [currentPage, setCurrentPage] = useState(pagination.page);
   const [itemsPerPage, setItemsPerPage] = useState(pagination.limit);
+  const [selectedTestCases, setSelectedTestCases] = useState<string[]>([]);
   
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
@@ -362,6 +371,33 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(startItem + itemsPerPage - 1, filteredAndSortedTestCases.length);
   
+  // Function to toggle selection of a test case
+  const toggleTestCaseSelection = (testCaseId: string) => {
+    setSelectedTestCases(prev => {
+      if (prev.includes(testCaseId)) {
+        return prev.filter(id => id !== testCaseId);
+      } else {
+        return [...prev, testCaseId];
+      }
+    });
+  };
+
+  // Function to select all visible test cases
+  const selectAllTestCases = () => {
+    if (selectedTestCases.length === filteredAndSortedTestCases.length) {
+      setSelectedTestCases([]);
+    } else {
+      setSelectedTestCases(filteredAndSortedTestCases.map(tc => tc.id));
+    }
+  };
+
+  // Function to run selected test cases
+  const runSelectedTestCases = () => {
+    if (onRunSelected && selectedTestCases.length > 0) {
+      onRunSelected(selectedTestCases);
+    }
+  };
+
   return (
     <>
       <Card>
@@ -402,6 +438,17 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
                   ))}
                 </SelectContent>
               </Select>
+              
+              {onRunSelected && selectedTestCases.length > 0 && (
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  onClick={runSelectedTestCases}
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  Run Selected ({selectedTestCases.length})
+                </Button>
+              )}
               
               <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/test-cases/new`)}>
                 New Test Case
@@ -476,6 +523,15 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
               <Table className="w-full">
                 <TableHeader>
                   <TableRow className="h-10 hover:bg-transparent">
+                    {onRunSelected && (
+                      <TableHead className="py-2 w-10">
+                        <Checkbox 
+                          checked={selectedTestCases.length > 0 && selectedTestCases.length === filteredAndSortedTestCases.length}
+                          onCheckedChange={selectAllTestCases}
+                          aria-label="Select all"
+                        />
+                      </TableHead>
+                    )}
                     <TableHead className="py-2">Name</TableHead>
                     <TableHead className="py-2">Status</TableHead>
                     <TableHead className="py-2">Tags</TableHead>
@@ -501,6 +557,15 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
                 <TableBody>
                   {paginatedTestCases.map((testCase) => (
                     <TableRow key={testCase.id} className="h-10 hover:bg-muted/50">
+                      {onRunSelected && (
+                        <TableCell className="py-1">
+                          <Checkbox 
+                            checked={selectedTestCases.includes(testCase.id)}
+                            onCheckedChange={() => toggleTestCaseSelection(testCase.id)}
+                            aria-label={`Select ${testCase.name}`}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium py-1">
                         <Link 
                           href={`/projects/${projectId}/test-cases/${testCase.id}`}
@@ -536,16 +601,17 @@ export function TestCaseTable({ testCases = [], projectId, pagination, filters }
                               <span className="sr-only">Edit</span>
                             </Link>
                           </Button>
-                          
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="h-7 w-7"
-                          >
-                            <Play className="h-3.5 w-3.5" />
-                            <span className="sr-only">Run</span>
-                          </Button>
-                          
+                                                      
+                           <Button 
+                             variant="ghost" 
+                             size="icon"
+                             className="h-7 w-7"
+                             onClick={() => onRunSelected ? onRunSelected([testCase.id]) : null}
+                           >
+                             <Play className="h-3.5 w-3.5" />
+                             <span className="sr-only">Run</span>
+                           </Button>
+                                                      
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7">

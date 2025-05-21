@@ -105,6 +105,42 @@ export class TestCaseService {
     return response;
   }
 
+  async getTestResult(projectId: string, resultId: string): Promise<TestResult> {
+    console.log(`Fetching test result for ID: ${resultId}`);
+    const response = await this.apiClient.get<TestResult>(
+      `/projects/${projectId}/test-results/${resultId}`
+    );
+    console.log(`Raw API response for test result:`, response);
+    
+    // Ensure output is preserved
+    const result: TestResult = {
+      ...response,
+      // Make sure output is included even if it's not in the response
+      output: response.output || undefined
+    };
+    
+    console.log(`Processed test result in service:`, result);
+    return result;
+  }
+
+  async runTest(projectId: string, options: {
+    command: string;
+    mode: 'file' | 'list' | 'project';
+    testCaseId?: string | null;
+    testCaseIds?: string[];
+    browser: string;
+    headless: boolean;
+    config: any;
+    testFilePath: string;
+    useReadableNames?: boolean;
+  }): Promise<{ testResultId: string }> {
+    const response = await this.apiClient.post<{ testResultId: string }>(
+      `/projects/${projectId}/run-test`,
+      options
+    );
+    return response;
+  }
+
   async getTestCaseSteps(projectId: string, testCaseId: string): Promise<Step[]> {
     const response = await this.apiClient.get<Step[]>(
       `/projects/${projectId}/test-cases/${testCaseId}/steps`
