@@ -11,7 +11,7 @@ export async function POST(
   { params }: { params: { id: string; fixtureId: string; versionId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId, versionId } = params;
+    const { id: projectId, fixtureId, versionId } = await params;
     const userEmail = await getCurrentUserEmail();
     
     // Check permission

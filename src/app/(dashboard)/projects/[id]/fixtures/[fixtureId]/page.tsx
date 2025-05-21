@@ -64,57 +64,61 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AddStepForm, StepFormData } from '@/components/step/add-step-form';
+import { ProjectService, FixtureService } from '@/lib/api/services';
+import { Fixture as ApiFixture, FixtureVersion as ApiFixtureVersion, Step as ApiStep, Project } from '@/lib/api/interfaces';
 
-interface Fixture {
-  id: string;
-  name: string;
-  playwrightScript: string | null;
-  type: string;
-  exportName: string | null;
-  filename: string | null;
-  fixtureFilePath: string | null;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string | null;
-  updatedBy: string | null;
+// Custom interfaces to handle type differences
+interface Fixture extends Omit<ApiFixture, 'versions' | 'steps'> {
   versions?: FixtureVersion[];
   steps?: Step[];
 }
 
-interface FixtureVersion {
-  id: string;
-  version: string;
-  name: string;
-  description: string | null;
-  content: string | null;
-  playwrightScript: string | null;
-  createdAt: string;
-  createdBy: string | null;
+interface FixtureVersion extends Omit<ApiFixtureVersion, 'version' | 'steps'> {
+  version: string; // Component expects string, API returns number
   steps?: Step[];
 }
 
-interface Step {
-  id: string;
-  action: string;
-  data?: string | null;
-  expected?: string | null;
-  order: number;
-  disabled: boolean;
-  testCaseId?: string | null;
-  fixtureId?: string | null;
-  playwrightScript?: string | null;
+interface Step extends Omit<ApiStep, 'disabled'> {
+  disabled: boolean; // Component expects boolean, API might return undefined
 }
 
-interface Project {
-  id: string;
-  name: string;
-}
+// Type conversion functions
+const convertApiFixture = (apiFixture: ApiFixture): Fixture => {
+  const result: Fixture = {
+    ...apiFixture,
+  };
+  
+  // Add versions if they exist
+  if ('versions' in apiFixture && Array.isArray(apiFixture.versions)) {
+    result.versions = apiFixture.versions.map(v => convertApiFixtureVersion(v));
+  }
+  
+  // Add steps if they exist
+  if ('steps' in apiFixture && Array.isArray(apiFixture.steps)) {
+    result.steps = apiFixture.steps.map(s => convertApiStep(s));
+  }
+  
+  return result;
+};
+
+const convertApiFixtureVersion = (apiVersion: ApiFixtureVersion): FixtureVersion => ({
+  ...apiVersion,
+  version: apiVersion.version.toString()
+});
+
+const convertApiStep = (apiStep: ApiStep): Step => ({
+  ...apiStep,
+  disabled: apiStep.disabled ?? false
+});
 
 export default function FixtureDetailPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
   const fixtureId = params.fixtureId as string;
+  
+  const projectService = new ProjectService();
+  const fixtureService = new FixtureService();
   
   const [fixture, setFixture] = useState<Fixture | null>(null);
   const [project, setProject] = useState<Project | null>(null);
@@ -135,50 +139,42 @@ export default function FixtureDetailPage() {
   const canDelete = usePermission('update', 'project', projectId);
   
   const fetchProject = async (projectId: string): Promise<Project | null> => {
-    const res = await fetch(`/api/projects/${projectId}`);
-    
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      throw new Error('Failed to fetch project');
+    try {
+      const project = await projectService.getProject(projectId);
+      return project;
+    } catch (error) {
+      console.error('Failed to fetch project:', error);
+      return null;
     }
-    
-    return res.json();
   };
   
   const fetchFixture = async (): Promise<Fixture | null> => {
-    const res = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}?versions=true`);
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      const errorMessage = errorData.error || 'Failed to fetch fixture';
+    try {
+      const apiFixture = await fixtureService.getFixture(projectId, fixtureId);
+      return apiFixture ? convertApiFixture(apiFixture) : null;
+    } catch (error) {
+      const errorMessage = (error as any)?.message || 'Failed to fetch fixture';
       
-      if (res.status === 403) {
+      if ((error as any)?.status === 403) {
         console.error('Permission error:', errorMessage);
         toast.error('You do not have permission to view this fixture');
         router.push(`/projects/${projectId}?tab=fixtures`);
-        return null;
-      } else if (res.status === 404) {
+      } else if ((error as any)?.status === 404) {
         console.error('Fixture fetch error:', errorMessage);
         toast.error(errorMessage);
         router.push(`/projects/${projectId}?tab=fixtures`);
-        return null;
       } else {
-        throw new Error(errorMessage);
+        console.error('Error fetching fixture:', error);
+        toast.error(errorMessage);
       }
+      return null;
     }
-    
-    return res.json();
   };
   
   const fetchFixtureVersions = async (): Promise<FixtureVersion[]> => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/versions`);
-      
-      if (!res.ok) {
-        throw new Error('Failed to fetch fixture versions');
-      }
-      
-      return res.json();
+      const apiVersions = await fixtureService.getFixtureVersions(projectId, fixtureId);
+      return apiVersions.map(convertApiFixtureVersion);
     } catch (error) {
       console.error('Failed to fetch fixture versions:', error);
       return [];
@@ -187,20 +183,29 @@ export default function FixtureDetailPage() {
   
   const fetchFixtureSteps = async (): Promise<Step[]> => {
     try {
-      // Using the fixture repository's findWithSteps functionality
-      const res = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/steps`);
-      
-      if (!res.ok) {
-        if (res.status !== 404) { // Don't throw for 404, just return empty array
-          console.error('Error fetching fixture steps:', await res.json());
-        }
-        return [];
-      }
-      
-      return res.json();
+      const apiSteps = await fixtureService.getFixtureSteps(projectId, fixtureId);
+      return apiSteps.map(convertApiStep);
     } catch (error) {
       console.error('Failed to fetch fixture steps:', error);
       return [];
+    }
+  };
+
+  const fetchVersionSteps = async (versionId: string): Promise<Step[]> => {
+    try {
+      const apiSteps = await fixtureService.getFixtureVersionSteps(projectId, fixtureId, versionId);
+      return apiSteps.map(convertApiStep);
+    } catch (error) {
+      console.error('Failed to fetch version steps:', error);
+      return [];
+    }
+  };
+  
+  const revertFixtureToVersion = async (versionId: string): Promise<void> => {
+    try {
+      await fixtureService.revertFixtureToVersion(projectId, fixtureId, versionId);
+    } catch (error) {
+      throw error;
     }
   };
   
@@ -246,14 +251,7 @@ export default function FixtureDetailPage() {
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
-      const res = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete fixture');
-      }
+      await fixtureService.deleteFixture(projectId, fixtureId);
       
       toast.success('Fixture deleted successfully');
       router.push(`/projects/${projectId}?tab=fixtures`);
@@ -273,31 +271,17 @@ export default function FixtureDetailPage() {
     }
   };
   
-  const handleViewVersion = (version: FixtureVersion) => {
+  const handleViewVersion = async (version: FixtureVersion) => {
     setActiveVersion(version);
     
-    // Fetch the steps associated with this fixture version
-    const fetchVersionSteps = async () => {
-      try {
-        const res = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/versions/${version.id}/steps`);
-        
-        if (!res.ok) {
-          console.error('Error fetching version steps:', await res.json());
-          // Fallback to current steps if error
-          setVersionSteps(steps);
-          return;
-        }
-        
-        const stepsData = await res.json();
-        setVersionSteps(stepsData);
-      } catch (error) {
-        console.error('Failed to fetch version steps:', error);
-        // Fallback to current steps if error
-        setVersionSteps(steps);
-      }
-    };
+    try {
+      const stepsData = await fetchVersionSteps(version.id);
+      setVersionSteps(stepsData);
+    } catch (error) {
+      console.error('Failed to fetch version steps:', error);
+      setVersionSteps([]);
+    }
     
-    fetchVersionSteps();
     setIsViewVersionDialogOpen(true);
   };
   
@@ -312,14 +296,7 @@ export default function FixtureDetailPage() {
     try {
       setIsReverting(true);
       
-      const res = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/revert/${activeVersion.id}`, {
-        method: 'POST',
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to revert fixture');
-      }
+      await revertFixtureToVersion(activeVersion.id);
       
       toast.success(`Fixture reverted to version from ${formatDate(activeVersion.createdAt)}`);
       setIsRevertDialogOpen(false);
@@ -349,15 +326,11 @@ export default function FixtureDetailPage() {
     try {
       setIsAddingStep(true);
       
-      // Log giá trị ban đầu để gỡ lỗi
       console.log('Playwright script before processing:', formData.playwrightScript);
-      
-      // Tự động tạo playwrightScript nếu không được cung cấp
       let playwrightScript = formData.playwrightScript;
       
-      // Chỉ tạo script mặc định nếu field là null hoặc undefined, không phải khi nó là chuỗi rỗng
+
       if (playwrightScript === undefined || playwrightScript === null) {
-        // Tạo một script mặc định dựa trên action
         if (formData.action.toLowerCase().includes('click')) {
           playwrightScript = `await page.click('[data-testid="element"]');`;
         } else if (formData.action.toLowerCase().includes('fill') || formData.action.toLowerCase().includes('input')) {
@@ -371,26 +344,14 @@ export default function FixtureDetailPage() {
         }
       }
       
-      // Log giá trị cuối cùng để gỡ lỗi
       console.log('Playwright script after processing:', playwrightScript);
       
-      const response = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/steps`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: formData.action,
-          data: formData.data || undefined,
-          expected: formData.expected || undefined,
-          playwrightScript: playwrightScript,
-        }),
+      await fixtureService.createFixtureStep(projectId, fixtureId, {
+        action: formData.action,
+        data: formData.data || undefined,
+        expected: formData.expected || undefined,
+        playwrightScript: playwrightScript,
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add step');
-      }
       
       // Update the steps list
       await refreshFixtureData();
@@ -411,24 +372,20 @@ export default function FixtureDetailPage() {
     try {
       setIsCloning(true);
       
-      const response = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/clone`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to clone fixture');
-      }
-
-      const result = await response.json();
+      const clonedFixture = await fixtureService.cloneFixture(projectId, fixtureId);
       
       toast.success('Fixture cloned successfully');
       
+      console.log('Clone result:', clonedFixture);
+
+      if (!clonedFixture || !clonedFixture.id) {
+        console.error('Invalid response from clone API:', clonedFixture);
+        toast.error('Could not retrieve cloned fixture ID');
+        return;
+      }
+      
       // Navigate to the new fixture
-      router.push(`/projects/${projectId}/fixtures/${result.fixture.id}`);
+      router.push(`/projects/${projectId}/fixtures/${clonedFixture.id}`);
     } catch (error) {
       console.error('Error cloning fixture:', error);
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred');

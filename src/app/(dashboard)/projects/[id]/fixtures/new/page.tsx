@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { ChevronLeft, Loader2, FileCode } from 'lucide-react';
 import { toCamelCase, toValidFileName } from '@/lib/utils/string-utils';
+import { ProjectService, FixtureService } from '@/lib/api/services';
 
 // Form validation schema
 const fixtureFormSchema = z.object({
@@ -60,19 +61,16 @@ export default function NewFixturePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [projectExists, setProjectExists] = useState(false);
   
+  const projectService = new ProjectService();
+  const fixtureService = new FixtureService();
+  
   // Check if project exists
   useEffect(() => {
     async function checkProjectExists() {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/projects/${projectId}`);
-        
-        if (!response.ok) {
-          // If project doesn't exist, set state to indicate this
-          setProjectExists(false);
-        } else {
-          setProjectExists(true);
-        }
+        await projectService.getProject(projectId);
+        setProjectExists(true);
       } catch (error) {
         console.error("Failed to check project:", error);
         setProjectExists(false);
@@ -130,28 +128,16 @@ export default function NewFixturePage() {
         type: values.type
       });
       
-      const response = await fetch(`/api/projects/${projectId}/fixtures`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-      
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to create fixture');
-      }
+      const createdFixture = await fixtureService.createFixture(projectId, values);
       
       // Log created fixture for debugging
-      console.log('Fixture created successfully:', responseData);
+      console.log('Fixture created successfully:', createdFixture);
       
       toast.success('Fixture created successfully');
       
       // Kiểm tra xem response có chứa fixture hợp lệ không
-      if (!responseData || !responseData.id) {
-        console.error('Invalid fixture data returned', responseData);
+      if (!createdFixture || !createdFixture.id) {
+        console.error('Invalid fixture data returned', createdFixture);
         toast.error('Invalid fixture data returned');
         setIsSubmitting(false);
         return;
@@ -159,32 +145,12 @@ export default function NewFixturePage() {
       
       // Verify fixture exists before navigating
       try {
-        const verifyResponse = await fetch(`/api/projects/${projectId}/fixtures/${responseData.id}?versions=true`);
-        
-        if (!verifyResponse.ok) {
-          const verifyErrorData = await verifyResponse.json();
-          console.error('Created fixture verification failed:', {
-            status: verifyResponse.status,
-            error: verifyErrorData
-          });
-          
-          if (verifyResponse.status === 403) {
-            toast.warning('Fixture created but you may not have permission to view it');
-          } else {
-            toast.error('Created fixture could not be verified');
-          }
-          
-          // Redirect to fixtures list regardless
-          router.push(`/projects/${projectId}?tab=fixtures`);
-          return;
-        }
-        
-        const verifiedFixture = await verifyResponse.json();
+        const verifiedFixture = await fixtureService.getFixture(projectId, createdFixture.id);
         console.log('Fixture verified successfully:', verifiedFixture);
         
         // Wait a moment to ensure database consistency before navigation
         setTimeout(() => {
-          router.push(`/projects/${projectId}/fixtures/${responseData.id}`);
+          router.push(`/projects/${projectId}/fixtures/${createdFixture.id}`);
         }, 1000);
       } catch (verifyError) {
         console.error('Error verifying fixture:', verifyError);

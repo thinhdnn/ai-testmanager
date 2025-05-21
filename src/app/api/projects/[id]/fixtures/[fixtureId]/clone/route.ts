@@ -143,10 +143,20 @@ export async function POST(
       // We don't fail the request if file generation fails
     }
 
+    // Log response data for debugging
+    console.log('Sending response with cloned fixture:', {
+      id: result.fixture.id,
+      name: result.fixture.name
+    });
+
     return NextResponse.json({
-      success: true,
+      id: result.fixture.id,
+      name: result.fixture.name,
+      type: result.fixture.type,
+      exportName: result.fixture.exportName,
+      projectId: result.fixture.projectId,
+      // Include other required fields
       message: 'Fixture cloned successfully',
-      fixture: result.fixture,
       steps: result.steps
     });
   } catch (error) {

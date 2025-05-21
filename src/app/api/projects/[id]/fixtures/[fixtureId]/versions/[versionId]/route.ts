@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: { id: string; fixtureId: string; versionId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId, versionId } = params;
+    const { id: projectId, fixtureId, versionId } = await params;
     
     // Check permission
     const hasPermission = await checkResourcePermission('project', 'view', projectId);
@@ -44,7 +44,7 @@ export async function DELETE(
   { params }: { params: { id: string; fixtureId: string; versionId: string } }
 ) {
   try {
-    const { id: projectId, fixtureId, versionId } = params;
+    const { id: projectId, fixtureId, versionId } = await params;
     
     // Check permission
     const hasPermission = await checkResourcePermission('project', 'update', projectId);

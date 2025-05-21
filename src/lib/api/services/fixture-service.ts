@@ -114,10 +114,40 @@ export class FixtureService {
   }
 
   async cloneFixture(projectId: string, fixtureId: string): Promise<Fixture> {
-    const response = await this.apiClient.post<Fixture>(
-      `/projects/${projectId}/fixtures/${fixtureId}/clone`,
-      {}
+    try {
+      console.log(`[FixtureService] Cloning fixture: ${fixtureId} in project: ${projectId}`);
+      const response = await this.apiClient.post<Fixture>(
+        `/projects/${projectId}/fixtures/${fixtureId}/clone`,
+        {}
+      );
+      
+      // Log response để debug
+      console.log(`[FixtureService] Clone response:`, response);
+      
+      // Kiểm tra xem response có đúng format không
+      if (!response || !response.id) {
+        console.error('[FixtureService] Invalid clone response format:', response);
+        throw new Error('Invalid response format from clone API');
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('[FixtureService] Clone error:', error);
+      throw error;
+    }
+  }
+
+  async getFixtureVersionSteps(projectId: string, fixtureId: string, versionId: string): Promise<Step[]> {
+    const response = await this.apiClient.get<Step[]>(
+      `/projects/${projectId}/fixtures/${fixtureId}/versions/${versionId}/steps`
     );
     return response;
+  }
+
+  async revertFixtureToVersion(projectId: string, fixtureId: string, versionId: string): Promise<void> {
+    await this.apiClient.post(
+      `/projects/${projectId}/fixtures/${fixtureId}/revert/${versionId}`,
+      {}
+    );
   }
 } 

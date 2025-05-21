@@ -49,7 +49,7 @@ export async function GET(
     params: { id: string; fixtureId: string; versionId: string };
   }
 ) {
-  const { id: projectId, fixtureId, versionId } = params;
+  const { id: projectId, fixtureId, versionId } = await params;
 
   try {
     // Check if user has permission to view the project
