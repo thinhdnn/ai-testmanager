@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { ChevronLeft, Loader2, FileCode, AlertTriangle } from 'lucide-react';
 import { toCamelCase, toValidFileName } from '@/lib/utils/string-utils';
+import { FixtureService } from '@/lib/api/services';
 
 // Form validation schema
 const fixtureFormSchema = z.object({
@@ -69,6 +70,7 @@ export default function EditFixturePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fixture, setFixture] = useState<Fixture | null>(null);
   const [shouldAutoUpdateExportName, setShouldAutoUpdateExportName] = useState(true);
+  const fixtureService = new FixtureService();
   
   // Initialize form with empty values, will be updated once fixture is loaded
   const form = useForm<FixtureFormValues>({
@@ -110,29 +112,25 @@ export default function EditFixturePage() {
   const fetchFixture = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}`);
+      const data = await fixtureService.getFixture(projectId, fixtureId);
       
-      if (!response.ok) {
-        if (response.status === 404) {
-          toast.error('Fixture not found');
-          router.push(`/projects/${projectId}?tab=fixtures`);
-          return;
-        }
-        throw new Error('Failed to fetch fixture');
-      }
-      
-      const data = await response.json();
       setFixture(data);
+      
+      // Ensure type is a valid value
+      const fixtureType = (data.type === 'extend' || data.type === 'inline') 
+        ? data.type 
+        : 'extend'; // Default to 'extend' if invalid type
       
       // Reset form with fixture data
       form.reset({
         name: data.name,
-        type: data.type,
+        type: fixtureType,
         exportName: data.exportName || '',
       });
     } catch (error) {
       toast.error('Failed to load fixture details');
       console.error(error);
+      router.push(`/projects/${projectId}?tab=fixtures`);
     } finally {
       setIsLoading(false);
     }
@@ -155,18 +153,7 @@ export default function EditFixturePage() {
         type: values.type 
       });
       
-      const response = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update fixture');
-      }
+      await fixtureService.updateFixture(projectId, fixtureId, values);
       
       toast.success('Fixture updated successfully');
       router.push(`/projects/${projectId}/fixtures/${fixtureId}`);
