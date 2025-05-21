@@ -56,6 +56,7 @@ import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/utils/date';
 import { Edit, Code, MoreHorizontal, Copy, Trash, Search, X, ArrowUpDown, ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { FixtureService } from '@/lib/api/services';
 
 // Type for sorting direction
 type SortDirection = 'asc' | 'desc' | null;
@@ -94,6 +95,7 @@ interface FixtureTableProps {
 
 export function FixtureTable({ fixtures = [], projectId, pagination, filters }: FixtureTableProps) {
   const router = useRouter();
+  const fixtureService = new FixtureService();
   
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
   const [typeFilter, setTypeFilter] = useState(filters.type || 'all');
@@ -266,17 +268,7 @@ export function FixtureTable({ fixtures = [], projectId, pagination, filters }: 
     try {
       setIsDeleting(true);
       
-      const response = await fetch(`/api/projects/${projectId}/fixtures/${fixtureToDelete.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete fixture');
-      }
+      await fixtureService.deleteFixture(projectId, fixtureToDelete.id);
       
       toast.success('Fixture deleted successfully');
       
@@ -309,24 +301,12 @@ export function FixtureTable({ fixtures = [], projectId, pagination, filters }: 
     try {
       setIsCloning(true);
       
-      const response = await fetch(`/api/projects/${projectId}/fixtures/${fixture.id}/clone`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to clone fixture');
-      }
-
-      const result = await response.json();
+      const clonedFixture = await fixtureService.cloneFixture(projectId, fixture.id);
       
       toast.success('Fixture cloned successfully');
       
       // Add the new fixture to the local state
-      setLocalFixtures(prevFixtures => [...prevFixtures, result.fixture]);
+      setLocalFixtures(prevFixtures => [...prevFixtures, clonedFixture]);
       
       // Refresh the router to update the UI
       router.refresh();
