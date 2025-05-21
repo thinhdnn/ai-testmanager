@@ -31,4 +31,15 @@ export interface TestResult {
   createdAt: string | Date;
   browser: string | null;
   videoUrl: string | null;
+}
+
+export interface FixturePageProps {
+  params: {
+    id: string;
+  };
+  searchParams: {
+    page?: string;
+    search?: string;
+    type?: string;
+  };
 } 
