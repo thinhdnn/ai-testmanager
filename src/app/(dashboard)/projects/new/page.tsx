@@ -1,6 +1,6 @@
 "use client";
 
-import { ProjectForm } from '@/components/project/ProjectForm';
+import { ProjectForm } from '@/components/project/project-form';
 
 export default function NewProjectPage() {
   return (

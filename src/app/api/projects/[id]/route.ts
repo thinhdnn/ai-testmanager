@@ -3,8 +3,10 @@ import { ProjectRepository } from '@/lib/db/repositories/project-repository';
 import { checkResourcePermission } from '@/lib/rbac/check-permission';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { checkPermission } from '@/lib/rbac/check-permission';
+import { PrismaClient } from '@prisma/client';
 
 const projectRepository = new ProjectRepository();
+const prisma = new PrismaClient();
 
 // Get a single project by ID
 export async function GET(
@@ -62,9 +64,9 @@ export async function PUT(
     const data = await request.json();
     
     // Validate required fields
-    if (!data.name || !data.url) {
+    if (!data.name || !data.baseURL) {
       return NextResponse.json(
-        { error: 'Name and URL are required' },
+        { error: 'Name and Base URL are required' },
         { status: 400 }
       );
     }
@@ -75,12 +77,35 @@ export async function PUT(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
+    // Update project details
     const project = await projectRepository.update(projectId, {
       name: data.name,
-      url: data.url,
       description: data.description,
       environment: data.environment,
       updatedBy: userEmail,
+    });
+
+    // Update baseURL in project settings
+    await prisma.projectSetting.upsert({
+      where: {
+        projectId_category_key: {
+          projectId,
+          category: 'browser',
+          key: 'baseURL',
+        },
+      },
+      update: {
+        value: data.baseURL,
+        updatedBy: userEmail,
+      },
+      create: {
+        projectId,
+        category: 'browser',
+        key: 'baseURL',
+        value: data.baseURL,
+        createdBy: userEmail,
+        updatedBy: userEmail,
+      },
     });
 
     return NextResponse.json(project);

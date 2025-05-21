@@ -12,6 +12,16 @@ export interface Project {
   lastRun?: Date | null;
 }
 
+export interface UIProject {
+  id: string;
+  name: string;
+  url?: string;
+  description: string | null;
+  environment: string;
+  updatedAt?: string;
+  testCases?: any[];
+}
+
 export interface ProjectListResponse {
   projects: Project[];
   pagination: PaginationData;

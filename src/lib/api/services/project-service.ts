@@ -35,7 +35,12 @@ export class ProjectService {
 
   async updateProject(
     projectId: string,
-    data: Partial<Project>
+    data: {
+      name: string;
+      description?: string;
+      environment?: string;
+      baseURL?: string;
+    }
   ): Promise<Project> {
     return apiClient.put<Project>(`/projects/${projectId}`, data);
   }

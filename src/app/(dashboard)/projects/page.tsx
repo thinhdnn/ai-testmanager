@@ -2,31 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ProjectCard } from '@/components/project/ProjectCard';
+import { ProjectCard } from '@/components/project/project-card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { PlusCircle, Loader2 } from 'lucide-react';
-
-interface Project {
-  id: string;
-  name: string;
-  url: string;
-  description: string | null;
-  environment: string;
-  updatedAt: string;
-  testCases?: any[];
-}
-
-interface PaginationData {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+import { UIProject, PaginationData } from '@/types/project';
 
 export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<UIProject[]>([]);
   const [pagination, setPagination] = useState<PaginationData>({
     total: 0,
     page: 1,

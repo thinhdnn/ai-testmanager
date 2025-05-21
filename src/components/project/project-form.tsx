@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
+import { ProjectService } from '@/lib/api/services';
+import { UIProject } from '@/types/project';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,18 +46,14 @@ const defaultValues: Partial<ProjectFormValues> = {
 };
 
 interface ProjectFormProps {
-  project?: {
-    id?: string;
-    name: string;
-    description?: string | null;
-    environment: string;
-  };
+  project?: UIProject;
   mode: 'create' | 'edit';
 }
 
 export function ProjectForm({ project, mode }: ProjectFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const projectService = new ProjectService();
 
   // Initialize form with project data or defaults
   const form = useForm<ProjectFormValues>({
@@ -73,16 +71,19 @@ export function ProjectForm({ project, mode }: ProjectFormProps) {
   // Load baseURL from project settings if in edit mode
   useEffect(() => {
     if (mode === 'edit' && project?.id) {
-      fetch(`/api/projects/${project.id}/configuration`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.browser?.baseURL) {
-            form.setValue('baseURL', data.browser.baseURL);
+      const loadConfig = async () => {
+        try {
+          const config = await projectService.getProjectConfiguration(project.id);
+          if (config.browser?.baseURL) {
+            form.setValue('baseURL', config.browser.baseURL);
           }
-        })
-        .catch(error => {
+        } catch (error) {
           console.error('Error loading project configuration:', error);
-        });
+          toast.error('Failed to load project configuration');
+        }
+      };
+      
+      loadConfig();
     }
   }, [project?.id, mode, form]);
 
@@ -90,30 +91,29 @@ export function ProjectForm({ project, mode }: ProjectFormProps) {
   async function onSubmit(values: ProjectFormValues) {
     setIsSubmitting(true);
     try {
-      const url = mode === 'create' 
-        ? '/api/projects' 
-        : `/api/projects/${project?.id}`;
-      
-      const method = mode === 'create' ? 'POST' : 'PUT';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Something went wrong');
+      if (!values.name || !values.baseURL) {
+        throw new Error('Name and Base URL are required');
       }
-
-      toast.success(
-        mode === 'create' 
-          ? 'Project created successfully' 
-          : 'Project updated successfully'
-      );
+      
+      if (mode === 'create') {
+        await projectService.createProject({
+          name: values.name,
+          description: values.description,
+          environment: values.environment,
+          baseURL: values.baseURL
+        });
+        toast.success('Project created successfully');
+      } else if (mode === 'edit' && project?.id) {
+        // Use the service with the same format as createProject
+        await projectService.updateProject(project.id, {
+          name: values.name,
+          description: values.description,
+          environment: values.environment,
+          baseURL: values.baseURL
+        });
+        
+        toast.success('Project updated successfully');
+      }
       
       router.push('/projects');
       router.refresh();

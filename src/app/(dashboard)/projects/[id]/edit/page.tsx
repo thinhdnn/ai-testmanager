@@ -2,40 +2,42 @@
 
 import { useEffect, useState } from 'react';
 import { notFound, useParams } from 'next/navigation';
-import { ProjectForm } from '@/components/project/ProjectForm';
+import { ProjectForm } from '@/components/project/project-form';
 import { toast } from 'sonner';
-
-interface Project {
-  id: string;
-  name: string;
-  url: string;
-  description: string | null;
-  environment: string;
-}
+import { ProjectService } from '@/lib/api/services';
+import { UIProject } from '@/types/project';
 
 export default function EditProjectPage() {
   const params = useParams();
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<UIProject | null>(null);
   const [loading, setLoading] = useState(true);
+  const projectService = new ProjectService();
 
   useEffect(() => {
     async function loadProject() {
+      if (!params.id) {
+        toast.error("Invalid project ID");
+        return notFound();
+      }
+
       try {
         setLoading(true);
-        const response = await fetch(`/api/projects/${params.id}`);
+        const projectId = typeof params.id === 'string' ? params.id : params.id[0];
+        const apiProject = await projectService.getProject(projectId);
         
-        if (!response.ok) {
-          if (response.status === 404) {
-            notFound();
-          }
-          throw new Error('Failed to fetch project');
-        }
-        
-        const data = await response.json();
-        setProject(data);
+        // Map API project to component's project structure
+        setProject({
+          id: apiProject.id,
+          name: apiProject.name,
+          description: apiProject.description || null,
+          environment: apiProject.environment
+        });
       } catch (error) {
         console.error("Failed to load project:", error);
         toast.error("Failed to load project");
+        if ((error as any)?.status === 404) {
+          notFound();
+        }
       } finally {
         setLoading(false);
       }

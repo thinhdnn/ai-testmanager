@@ -4,19 +4,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-
-interface Project {
-  id: string;
-  name: string;
-  url: string;
-  description: string | null;
-  environment: string;
-  updatedAt: Date | string;
-  testCases?: any[];
-}
+import { UIProject } from '@/types/project';
 
 interface ProjectCardProps {
-  project: Project;
+  project: UIProject;
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
@@ -44,13 +35,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <CardContent className="space-y-3 pb-2">
           <div className="flex items-center text-sm text-muted-foreground">
             <Globe className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground/70" />
-            <span className="truncate">{project.url}</span>
+            <span className="truncate">{project.url || 'No URL specified'}</span>
           </div>
           
           <div className="flex items-center text-sm text-muted-foreground">
             <Calendar className="mr-2 h-4 w-4 flex-shrink-0 text-muted-foreground/70" />
             <span>
-              Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
+              Updated {project.updatedAt ? formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true }) : 'recently'}
             </span>
           </div>
         </CardContent>
