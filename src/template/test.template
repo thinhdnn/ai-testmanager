@@ -1,32 +1,24 @@
-import { test as base, expect } from '@playwright/test';
-
-{{!-- Import all fixtures --}}
-{{#if fixtures}}
-{{#each fixtures}}
-import { {{name}} } from '{{path}}';
-{{/each}}
-{{/if}}
-
-{{!-- Extend fixtures if any use mode = "extend" --}}
-{{#if (any fixtures "mode" "extend")}}
-const test = base.extend({
-  {{#each fixtures}}
-  {{#if (eq mode "extend")}}
-  {{name}}: {{name}},
-  {{/if}}
-  {{/each}}
-});
-{{else}}
-const test = base;
-{{/if}}
+import { test, expect } from '../fixtures';
 
 {{!-- Main Test Definition --}}
 {{#if tags}}
 test('{{testCaseName}}', {
   tag: [{{#each tags}}'@{{this}}'{{#unless @last}}, {{/unless}}{{/each}}],
-}, async ({{#if (any fixtures "mode" "extend")}}{ page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }{{else}}{ page }{{/if}}) => {
+}, async (
+  {{#if (any fixtures "mode" "extend")}}
+    { page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }
+  {{else}}
+    { page }
+  {{/if}}
+) => {
 {{else}}
-test('{{testCaseName}}', async ({{#if (any fixtures "mode" "extend")}}{ page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }{{else}}{ page }{{/if}}) => {
+test('{{testCaseName}}', async (
+  {{#if (any fixtures "mode" "extend")}}
+    { page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }
+  {{else}}
+    { page }
+  {{/if}}
+) => {
 {{/if}}
 
   // Test Steps

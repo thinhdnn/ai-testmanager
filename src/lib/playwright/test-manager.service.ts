@@ -204,30 +204,40 @@ export class TestManagerService {
     const scriptLines: string[] = [];
     
     fixture.steps.forEach((step, index) => {
+      // Add a blank line before each step, except for the first step
+      if (index > 0) {
+        scriptLines.push('');
+      }
+      
       // Comment with step number and action
       scriptLines.push(`// Step ${index + 1}: ${step.action}`);
       
       if (step.disabled) {
         // Handle disabled step
         scriptLines.push(`/* DISABLED STEP`);
-        scriptLines.push(`// TODO: Implement this step`);
+        if (step.playwrightScript && step.playwrightScript.trim() !== '') {
+          // Use the playwrightScript if available
+          scriptLines.push(step.playwrightScript);
+        } else {
+          // Fallback to TODO comment if no script available
+          scriptLines.push(`// TODO: Implement this step`);
+        }
         if (step.expected) {
           scriptLines.push(`// Expected: ${step.expected}`);
         }
         scriptLines.push(`*/`);
       } else {
-        // Simple TODO comment for each step - avoiding explicit Playwright commands
-        scriptLines.push(`// TODO: Implement this step`);
+        // Use playwrightScript if available, otherwise use TODO comment
+        if (step.playwrightScript && step.playwrightScript.trim() !== '') {
+          scriptLines.push(step.playwrightScript);
+        } else {
+          scriptLines.push(`// TODO: Implement this step`);
+        }
         
         // Add expected result as comment if available
         if (step.expected) {
           scriptLines.push(`// Expected: ${step.expected}`);
         }
-      }
-      
-      // Add empty line between steps, except after the last step
-      if (index < fixture.steps.length - 1) {
-        scriptLines.push('');
       }
     });
     

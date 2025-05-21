@@ -29,6 +29,12 @@ Handlebars.registerHelper('add', function(a: number, b: number) {
   return a + b;
 });
 
+// Add capitalize helper
+Handlebars.registerHelper('capitalize', function(str: string) {
+  if (typeof str !== 'string') return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+});
+
 export class PlaywrightService {
   private readonly projectRoot: string;
   private readonly templatePath: string;
@@ -44,6 +50,10 @@ export class PlaywrightService {
     Handlebars.registerHelper('any', (array, property, value) => {
       if (!array) return false;
       return array.some((item: any) => item[property] === value);
+    });
+    Handlebars.registerHelper('capitalize', (str) => {
+      if (typeof str !== 'string') return '';
+      return str.charAt(0).toUpperCase() + str.slice(1);
     });
   }
 
@@ -71,9 +81,8 @@ export class PlaywrightService {
       await fs.mkdir(path.join(projectPath, 'fixtures'), { recursive: true });
       await fs.mkdir(path.join(projectPath, 'tests'), { recursive: true });
       
-      // Create index.ts in fixtures folder
-      const fixturesIndexPath = path.join(projectPath, 'fixtures', 'index.ts');
-      await fs.writeFile(fixturesIndexPath, '// Fixtures export file\n', 'utf8');
+      // Create index.ts in fixtures folder using our template
+      await this.updateFixturesIndexFile(path.join(projectPath, 'fixtures'), []);
 
       return projectPath;
     } catch (error: any) {
@@ -110,6 +119,19 @@ export class PlaywrightService {
     await fs.writeFile(params.outputPath, content, 'utf-8');
   }
 
+  async updateFixturesIndexFile(fixturesDir: string, fixtures: Array<{importName: string, fileName: string, exportName?: string}>): Promise<void> {
+    const indexPath = path.join(fixturesDir, 'index.ts');
+    
+    try {
+      const template = await this.loadTemplate('index.fixture');
+      const content = template({ fixtures });
+      await fs.writeFile(indexPath, content, 'utf-8');
+      console.log(`Updated fixtures index file at ${indexPath}`);
+    } catch (error: any) {
+      console.warn(`Warning: Could not update index.ts: ${error.message}`);
+    }
+  }
+
   async generateFixtureFile(params: {
     name: string;
     type: 'extend' | 'inline' | 'inlineExtend';
@@ -122,31 +144,69 @@ export class PlaywrightService {
     const content = template(params);
     await fs.writeFile(params.outputPath, content, 'utf-8');
     
-    // Add fixture export to index.ts
+    // Add fixture to index.ts
     const fixturesDir = path.dirname(params.outputPath);
-    const indexPath = path.join(fixturesDir, 'index.ts');
+    const fixtureFileName = path.basename(params.outputPath, '.ts');
+    const fixtureImportName = `${params.exportName}Fixture`;
     
     try {
-      // Check if index.ts exists, create it if not
-      try {
-        await fs.access(indexPath);
-      } catch {
-        await fs.writeFile(indexPath, '// Fixtures export file\n', 'utf8');
+      // Get all existing fixtures in the directory
+      const files = await fs.readdir(fixturesDir);
+      const fixtureFiles = files.filter(file => 
+        file.endsWith('.fixture.ts') && file !== 'index.ts'
+      );
+      
+      // Create fixture data array for template
+      const fixtures = fixtureFiles.map(file => {
+        const fileName = file.replace(/\.ts$/, '');
+        const exportName = fileName.replace(/\-([a-z])/g, (_, c) => c.toUpperCase()).replace(/\.fixture$/, '');
+        return {
+          importName: `${exportName}Fixture`,
+          fileName: fileName,
+          exportName: exportName
+        };
+      });
+      
+      // Ensure our new fixture is included
+      if (!fixtures.some(f => f.importName === fixtureImportName)) {
+        fixtures.push({
+          importName: fixtureImportName,
+          fileName: fixtureFileName,
+          exportName: params.exportName
+        });
       }
       
-      // Read current content
-      const indexContent = await fs.readFile(indexPath, 'utf8');
-      
-      // Generate export statement
-      const relativePath = `./${path.basename(params.outputPath, '.ts')}`;
-      const exportLine = `export { test as ${params.exportName} } from '${relativePath}';\n`;
-      
-      // Add export if it doesn't exist already
-      if (!indexContent.includes(exportLine)) {
-        await fs.writeFile(indexPath, indexContent + exportLine, 'utf8');
-      }
+      // Update the index.ts file
+      await this.updateFixturesIndexFile(fixturesDir, fixtures);
     } catch (error: any) {
       console.warn(`Warning: Could not update index.ts: ${error.message}`);
+    }
+  }
+
+  async removeFixtureFromIndex(fixturesDir: string, fixtureFileName: string): Promise<void> {
+    try {
+      // Get all existing fixtures in the directory
+      const files = await fs.readdir(fixturesDir);
+      const fixtureFiles = files.filter(file => 
+        file.endsWith('.fixture.ts') && file !== 'index.ts' && file !== `${fixtureFileName}.ts`
+      );
+      
+      // Create fixture data array for template without the removed fixture
+      const fixtures = fixtureFiles.map(file => {
+        const fileName = file.replace(/\.ts$/, '');
+        const exportName = fileName.replace(/\-([a-z])/g, (_, c) => c.toUpperCase()).replace(/\.fixture$/, '');
+        return {
+          importName: `${exportName}Fixture`,
+          fileName: fileName,
+          exportName: exportName
+        };
+      });
+      
+      // Update the index.ts file
+      await this.updateFixturesIndexFile(fixturesDir, fixtures);
+      console.log(`Removed fixture ${fixtureFileName} from index.ts`);
+    } catch (error: any) {
+      console.warn(`Warning: Could not update index.ts after removing fixture: ${error.message}`);
     }
   }
 } 

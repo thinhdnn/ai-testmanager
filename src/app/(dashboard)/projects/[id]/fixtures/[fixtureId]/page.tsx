@@ -349,9 +349,14 @@ export default function FixtureDetailPage() {
     try {
       setIsAddingStep(true);
       
+      // Log giá trị ban đầu để gỡ lỗi
+      console.log('Playwright script before processing:', formData.playwrightScript);
+      
       // Tự động tạo playwrightScript nếu không được cung cấp
       let playwrightScript = formData.playwrightScript;
-      if (!playwrightScript || playwrightScript.trim() === '') {
+      
+      // Chỉ tạo script mặc định nếu field là null hoặc undefined, không phải khi nó là chuỗi rỗng
+      if (playwrightScript === undefined || playwrightScript === null) {
         // Tạo một script mặc định dựa trên action
         if (formData.action.toLowerCase().includes('click')) {
           playwrightScript = `await page.click('[data-testid="element"]');`;
@@ -365,6 +370,9 @@ export default function FixtureDetailPage() {
           playwrightScript = `// Default action for: ${formData.action}\nawait page.waitForTimeout(1000);`;
         }
       }
+      
+      // Log giá trị cuối cùng để gỡ lỗi
+      console.log('Playwright script after processing:', playwrightScript);
       
       const response = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/steps`, {
         method: 'POST',

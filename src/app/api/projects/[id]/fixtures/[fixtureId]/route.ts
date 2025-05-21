@@ -8,8 +8,10 @@ import { getServerSession } from 'next-auth/next';
 import { incrementVersion } from '@/lib/utils/version';
 import { StepRepository } from '@/lib/db/repositories/step-repository';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
-import path from 'path';
+import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
+import { PlaywrightService } from '@/lib/playwright/playwright.service';
+import * as fs from 'fs/promises';
 
 const prisma = new PrismaClient();
 
@@ -248,8 +250,50 @@ export async function DELETE(
       );
     }
     
+    // Before deleting from database, get the fixture file path to remove from index.ts
+    const fixtureFilePath = fixture.fixtureFilePath;
+    
     // Attempt to delete - this will cascade delete fixture's own steps
     await fixtureRepository.delete(fixtureId);
+    
+    // If the fixture had a file, remove it from index.ts
+    if (fixtureFilePath) {
+      try {
+        // Get the project's Playwright directory path
+        const project = await prisma.project.findUnique({
+          where: { id: projectId }
+        });
+        
+        if (project && project.playwrightProjectPath) {
+          // Convert relative project path to absolute path
+          const appRoot = process.cwd();
+          const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+          
+          // Initialize PlaywrightService
+          const playwrightService = new PlaywrightService(appRoot);
+          
+          // Get the fixtures directory
+          const fixturesDir = path.dirname(path.join(absoluteProjectPath, fixtureFilePath));
+          
+          // Get the fixture filename without extension
+          const fixtureFileName = path.basename(fixtureFilePath, '.ts');
+          
+          // Remove from index.ts
+          await playwrightService.removeFixtureFromIndex(fixturesDir, fixtureFileName);
+          
+          // Optionally, attempt to delete the fixture file
+          try {
+            await fs.unlink(path.join(absoluteProjectPath, fixtureFilePath));
+            console.log(`Deleted fixture file: ${fixtureFilePath}`);
+          } catch (fileError: any) {
+            console.warn(`Could not delete fixture file: ${fileError.message}`);
+          }
+        }
+      } catch (indexError) {
+        console.error('Error updating index.ts after deleting fixture:', indexError);
+        // Continue anyway as the fixture is already deleted from the database
+      }
+    }
     
     return NextResponse.json({ success: true });
   } catch (error) {

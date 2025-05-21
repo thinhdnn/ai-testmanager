@@ -54,21 +54,22 @@ import {
 import { TestCaseService } from '@/lib/api/services/test-case-service';
 import { FixtureService } from '@/lib/api/services/fixture-service';
 import { Step as ApiStep } from '@/lib/api/interfaces';
+import { AddStepForm, StepFormData } from '@/components/step/add-step-form';
 
 interface Step {
   id: string;
   action: string;
-  data?: string | undefined;
-  expected?: string | undefined;
+  data?: string | undefined | null;
+  expected?: string | undefined | null;
   order: number;
   disabled: boolean;
-  fixtureId?: string | undefined;
+  fixtureId?: string | undefined | null;
   fixture?: {
     id: string;
     name: string;
     type: string;
-  } | undefined;
-  playwrightScript?: string | undefined;
+  } | undefined | null;
+  playwrightScript?: string | undefined | null;
 }
 
 interface TestStepsTableProps {
@@ -92,16 +93,12 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [showPlaywrightAdd, setShowPlaywrightAdd] = useState(false);
-  const [showPlaywrightEdit, setShowPlaywrightEdit] = useState(false);
   const [steps, setSteps] = useState<Step[]>(initialSteps);
   const [isMoveToDialogOpen, setIsMoveToDialogOpen] = useState(false);
   const [targetPosition, setTargetPosition] = useState<number>(1);
   const [stepToMove, setStepToMove] = useState<Step | null>(null);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [isLoadingFixtures, setIsLoadingFixtures] = useState(false);
-  const [showFixtureSuggestions, setShowFixtureSuggestions] = useState(false);
-  const [filteredFixtures, setFilteredFixtures] = useState<Fixture[]>([]);
   
   // Memoize service instances to prevent unnecessary re-creation
   const testCaseService = useMemo(() => new TestCaseService(), []);
@@ -115,35 +112,19 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
     setSteps(initialSteps);
   }, [initialSteps]);
   
-  // Form state for adding/editing steps
-  const [formData, setFormData] = useState({
-    action: '',
-    data: '',
-    expected: '',
-    fixtureId: '',
-    playwrightScript: '',
-  });
-  
   // Use project.update instead of testcase.update for permission check
   const canEdit = usePermission('update', 'project', projectId);
   
   // Reset forms when dialogs open/close
   useEffect(() => {
     if (isAddDialogOpen) {
-      setFormData({ action: '', data: '', expected: '', fixtureId: '', playwrightScript: '' });
-      setShowPlaywrightAdd(false);
       fetchFixtures();
-    } else {
-      setShowFixtureSuggestions(false);
     }
   }, [isAddDialogOpen]);
   
   useEffect(() => {
     if (isEditDialogOpen) {
       fetchFixtures();
-    } else {
-      setShowPlaywrightEdit(false);
-      setShowFixtureSuggestions(false);
     }
   }, [isEditDialogOpen]);
   
@@ -158,171 +139,6 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
       console.error('Error fetching fixtures:', error);
     } finally {
       setIsLoadingFixtures(false);
-    }
-  };
-  
-  // Watch for action input changes to show fixture suggestions
-  useEffect(() => {
-    // Only show fixture suggestions for test cases, not fixtures
-    if (isFixture) {
-      setShowFixtureSuggestions(false);
-      return;
-    }
-    
-    // Check if the action starts with "call" (case insensitive)
-    if (formData.action.trim().toLowerCase().startsWith('call')) {
-      // Filter fixtures based on what's after "call " if anything
-      const searchTerm = formData.action.trim().substring(5).toLowerCase();
-      
-      const filtered = fixtures.filter(fixture => 
-        searchTerm === '' || fixture.name.toLowerCase().includes(searchTerm)
-      );
-      
-      setFilteredFixtures(filtered);
-      setShowFixtureSuggestions(true);
-    } else {
-      setShowFixtureSuggestions(false);
-    }
-  }, [formData.action, fixtures, isFixture]);
-  
-  // Handle selecting a fixture from suggestions
-  const handleSelectFixture = (fixture: Fixture) => {
-    setFormData({
-      ...formData,
-      action: `Call fixture: ${fixture.name}`,
-      fixtureId: fixture.id
-    });
-    setShowFixtureSuggestions(false);
-  };
-  
-  // Handle adding a new step
-  const handleAddStep = async () => {
-    if (!formData.action) {
-      toast.error('Action is required');
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      
-      let result;
-      // Use the appropriate service based on whether it's a fixture or test case
-      if (isFixture) {
-        result = await fixtureService.createFixtureStep(projectId, testCaseId, {
-          action: formData.action,
-          data: formData.data || undefined,
-          expected: formData.expected || undefined,
-          fixtureId: formData.fixtureId || undefined,
-          playwrightScript: '', // Always use empty string for fixture steps
-        });
-      } else {
-        const response = await testCaseService.createTestCaseStep(projectId, testCaseId, {
-          action: formData.action,
-          data: formData.data || undefined,
-          expected: formData.expected || undefined,
-          fixtureId: formData.fixtureId || undefined,
-          playwrightScript: formData.playwrightScript || undefined,
-        });
-        result = response;
-      }
-      
-      // Update local state with the new step
-      setSteps(prevSteps => [...prevSteps, result as Step]);
-      
-      // If there's version info and onVersionUpdate callback, update the parent component
-      if (onVersionUpdate) {
-        onVersionUpdate('latest');
-      }
-
-      // Notify the parent component to refresh steps
-      if (onStepsChange) {
-        onStepsChange();
-      }
-      
-      toast.success('Step added successfully');
-      setIsAddDialogOpen(false);
-      setFormData({ action: '', data: '', expected: '', fixtureId: '', playwrightScript: '' });
-      
-      // Also refresh the router to ensure server-side data is updated
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Handle editing a step
-  const handleEditStep = async () => {
-    if (!activeStep) return;
-    
-    if (!formData.action) {
-      toast.error('Action is required');
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      
-      let result;
-      // Use the appropriate service based on whether it's a fixture or test case
-      if (isFixture) {
-        result = await fixtureService.updateFixtureStep(
-          projectId, 
-          testCaseId, 
-          activeStep.id, 
-          {
-            action: formData.action,
-            data: formData.data || undefined,
-            expected: formData.expected || undefined,
-            fixtureId: formData.fixtureId || undefined,
-            playwrightScript: '', // Always use empty string for fixture steps
-            disabled: activeStep.disabled,
-            order: activeStep.order,
-          }
-        );
-      } else {
-        result = await testCaseService.updateTestCaseStep(
-          projectId, 
-          testCaseId, 
-          activeStep.id, 
-          {
-            action: formData.action,
-            data: formData.data || undefined,
-            expected: formData.expected || undefined,
-            fixtureId: formData.fixtureId || undefined,
-            playwrightScript: formData.playwrightScript || undefined,
-            disabled: activeStep.disabled,
-            order: activeStep.order,
-          }
-        );
-      }
-      
-      // Update local state with the updated step
-      setSteps(prevSteps => 
-        prevSteps.map(step => step.id === activeStep.id ? result as Step : step)
-      );
-      
-      // If there's an onVersionUpdate callback, update the parent component
-      if (onVersionUpdate) {
-        onVersionUpdate('latest');
-      }
-      
-      // Notify the parent component to refresh steps
-      if (onStepsChange) {
-        onStepsChange();
-      }
-      
-      toast.success('Step updated successfully');
-      setIsEditDialogOpen(false);
-      setActiveStep(null);
-      
-      // Also refresh the router
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
-    } finally {
-      setIsLoading(false);
     }
   };
   
@@ -429,7 +245,6 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
       
       // Determine the new disabled state
       const newDisabledState = !step.disabled;
-      console.log(`Toggling step ${step.id} from ${step.disabled} to ${newDisabledState}`);
       
       // Use the appropriate service based on whether it's a fixture or test case
       let updatedStep;
@@ -464,8 +279,6 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
           }
         );
       }
-      
-      console.log('Server response:', updatedStep);
       
       // Update the local state - use the response from server if available, otherwise use our expected state
       setSteps(prevSteps => 
@@ -606,8 +419,7 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
           {steps.length > 0 && (
           <Button 
             onClick={() => {
-                setFormData({ action: '', data: '', expected: '', fixtureId: '', playwrightScript: '' });
-              setIsAddDialogOpen(true);
+                setIsAddDialogOpen(true);
             }}
             disabled={!canEdit}
           >
@@ -626,7 +438,6 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
             </p>
             <Button 
               onClick={() => {
-                setFormData({ action: '', data: '', expected: '', fixtureId: '', playwrightScript: '' });
                 setIsAddDialogOpen(true);
               }}
               disabled={!canEdit}
@@ -691,13 +502,6 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
                             <DropdownMenuItem
                               onClick={() => {
                                 setActiveStep(step);
-                                setFormData({
-                                    action: step.action || '',
-                                  data: step.data || '',
-                                  expected: step.expected || '',
-                                  fixtureId: step.fixtureId || '',
-                                    playwrightScript: step.playwrightScript || '',
-                                });
                                 setIsEditDialogOpen(true);
                               }}
                             >
@@ -787,130 +591,62 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2 relative">
-              <label htmlFor="action" className="text-sm font-medium">
-                Action <span className="text-destructive">*</span>
-              </label>
-              <Input
-                id="action"
-                placeholder="Click the login button"
-                value={formData.action}
-                onChange={(e) => setFormData({ ...formData, action: e.target.value })}
-              />
-              {!isFixture && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Type 'call' to add a fixture
-                </p>
-              )}
-              
-              {/* Fixture suggestions */}
-              {!isFixture && showFixtureSuggestions && filteredFixtures.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-background border border-border rounded-md shadow-md max-h-60 overflow-y-auto">
-                  <div className="p-2 text-xs text-muted-foreground border-b">
-                    Select a fixture:
-                  </div>
-                  {isLoadingFixtures ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-sm">Loading fixtures...</span>
-                    </div>
-                  ) : (
-                    <div className="py-1">
-                      {filteredFixtures.map((fixture) => (
-                        <div
-                          key={fixture.id}
-                          className="px-4 py-2 text-sm hover:bg-muted cursor-pointer flex items-center"
-                          onClick={() => handleSelectFixture(fixture)}
-                        >
-                          <Wrench className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {fixture.name}
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {fixture.type}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="data" className="text-sm font-medium">
-                Data
-              </label>
-              <Input
-                id="data"
-                placeholder="Username: admin, Password: password123"
-                value={formData.data}
-                onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="expected" className="text-sm font-medium">
-                Expected Result
-              </label>
-              <Textarea
-                id="expected"
-                placeholder="User should be redirected to the dashboard"
-                value={formData.expected}
-                onChange={(e) => setFormData({ ...formData, expected: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            {/* Only show Playwright Script for test cases, not fixtures */}
-            {!isFixture && (
-              <div className="border border-border rounded-md">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="flex w-full justify-between p-3 font-medium"
-                  onClick={() => setShowPlaywrightAdd(!showPlaywrightAdd)}
-                >
-                  <div className="flex items-center gap-2">
-                    <Code className="h-4 w-4" />
-                    <span>Playwright Script</span>
-                  </div>
-                  <ChevronRight className={`h-4 w-4 transition-transform ${showPlaywrightAdd ? 'rotate-90' : ''}`} />
-                </Button>
+          <AddStepForm 
+            onSubmit={async (data) => {
+              try {
+                setIsLoading(true);
                 
-                {showPlaywrightAdd && (
-                  <div className="p-3 pt-0">
-                    <Textarea
-                      id="playwright-script"
-                      placeholder="await page.click('.login-button');"
-                      value={formData.playwrightScript}
-                      onChange={(e) => setFormData({ ...formData, playwrightScript: e.target.value })}
-                      rows={5}
-                      className="font-mono text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Enter Playwright automation code for this step
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isLoading}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddStep} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                'Add Step'
-              )}
-            </Button>
-          </DialogFooter>
+                let result;
+                // Use the appropriate service based on whether it's a fixture or test case
+                if (isFixture) {
+                  result = await fixtureService.createFixtureStep(projectId, testCaseId, {
+                    action: data.action,
+                    data: data.data || undefined,
+                    expected: data.expected || undefined,
+                    fixtureId: data.fixtureId || undefined,
+                    playwrightScript: data.playwrightScript || undefined, // Use user-provided script
+                  });
+                } else {
+                  const response = await testCaseService.createTestCaseStep(projectId, testCaseId, {
+                    action: data.action,
+                    data: data.data || undefined,
+                    expected: data.expected || undefined,
+                    fixtureId: data.fixtureId || undefined,
+                    playwrightScript: data.playwrightScript || undefined,
+                  });
+                  result = response;
+                }
+                
+                // Update local state with the new step
+                setSteps(prevSteps => [...prevSteps, result as Step]);
+                
+                // If there's version info and onVersionUpdate callback, update the parent component
+                if (onVersionUpdate) {
+                  onVersionUpdate('latest');
+                }
+
+                // Notify the parent component to refresh steps
+                if (onStepsChange) {
+                  onStepsChange();
+                }
+                
+                toast.success('Step added successfully');
+                setIsAddDialogOpen(false);
+                
+                // Also refresh the router to ensure server-side data is updated
+                router.refresh();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            onCancel={() => setIsAddDialogOpen(false)}
+            isSubmitting={isLoading}
+            initialData={{ action: '', data: '', expected: '', playwrightScript: '' }}
+            isFixture={isFixture}
+            fixtures={fixtures}
+          />
         </DialogContent>
       </Dialog>
       
@@ -926,130 +662,87 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2 relative">
-              <label htmlFor="edit-action" className="text-sm font-medium">
-                Action <span className="text-destructive">*</span>
-              </label>
-              <Input
-                id="edit-action"
-                placeholder="Click the login button"
-                value={formData.action}
-                onChange={(e) => setFormData({ ...formData, action: e.target.value })}
-              />
-              {!isFixture && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Type 'call' to add a fixture
-                </p>
-              )}
-              
-              {/* Fixture suggestions */}
-              {!isFixture && showFixtureSuggestions && filteredFixtures.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-background border border-border rounded-md shadow-md max-h-60 overflow-y-auto">
-                  <div className="p-2 text-xs text-muted-foreground border-b">
-                    Select a fixture:
-                  </div>
-                  {isLoadingFixtures ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-sm">Loading fixtures...</span>
-                    </div>
-                  ) : (
-                    <div className="py-1">
-                      {filteredFixtures.map((fixture) => (
-                        <div
-                          key={fixture.id}
-                          className="px-4 py-2 text-sm hover:bg-muted cursor-pointer flex items-center"
-                          onClick={() => handleSelectFixture(fixture)}
-                        >
-                          <Wrench className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {fixture.name}
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {fixture.type}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="edit-data" className="text-sm font-medium">
-                Data
-              </label>
-              <Input
-                id="edit-data"
-                placeholder="Username: admin, Password: password123"
-                value={formData.data}
-                onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="edit-expected" className="text-sm font-medium">
-                Expected Result
-              </label>
-              <Textarea
-                id="edit-expected"
-                placeholder="User should be redirected to the dashboard"
-                value={formData.expected}
-                onChange={(e) => setFormData({ ...formData, expected: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            {/* Only show Playwright Script for test cases, not fixtures */}
-            {!isFixture && (
-              <div className="border border-border rounded-md">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="flex w-full justify-between p-3 font-medium"
-                  onClick={() => setShowPlaywrightEdit(!showPlaywrightEdit)}
-                >
-                  <div className="flex items-center gap-2">
-                    <Code className="h-4 w-4" />
-                    <span>Playwright Script</span>
-                  </div>
-                  <ChevronRight className={`h-4 w-4 transition-transform ${showPlaywrightEdit ? 'rotate-90' : ''}`} />
-                </Button>
-                
-                {showPlaywrightEdit && (
-                  <div className="p-3 pt-0">
-                    <Textarea
-                      id="edit-playwright-script"
-                      placeholder="await page.click('.login-button');"
-                      value={formData.playwrightScript}
-                      onChange={(e) => setFormData({ ...formData, playwrightScript: e.target.value })}
-                      rows={5}
-                      className="font-mono text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Enter Playwright automation code for this step
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isLoading}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditStep} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                'Update Step'
-              )}
-            </Button>
-          </DialogFooter>
+          {activeStep && (
+            <AddStepForm 
+              onSubmit={async (data) => {
+                try {
+                  setIsLoading(true);
+                  
+                  let result;
+                  // Use the appropriate service based on whether it's a fixture or test case
+                  if (isFixture) {
+                    result = await fixtureService.updateFixtureStep(
+                      projectId, 
+                      testCaseId, 
+                      activeStep.id, 
+                      {
+                        action: data.action,
+                        data: data.data || undefined,
+                        expected: data.expected || undefined,
+                        fixtureId: data.fixtureId || undefined,
+                        playwrightScript: data.playwrightScript || undefined, // Use user-provided script
+                        disabled: activeStep.disabled,
+                        order: activeStep.order,
+                      }
+                    );
+                  } else {
+                    result = await testCaseService.updateTestCaseStep(
+                      projectId, 
+                      testCaseId, 
+                      activeStep.id, 
+                      {
+                        action: data.action,
+                        data: data.data || undefined,
+                        expected: data.expected || undefined,
+                        fixtureId: data.fixtureId || undefined,
+                        playwrightScript: data.playwrightScript || undefined,
+                        disabled: activeStep.disabled,
+                        order: activeStep.order,
+                      }
+                    );
+                  }
+                  
+                  // Update local state with the updated step
+                  setSteps(prevSteps => 
+                    prevSteps.map(step => step.id === activeStep.id ? result as Step : step)
+                  );
+                  
+                  // If there's an onVersionUpdate callback, update the parent component
+                  if (onVersionUpdate) {
+                    onVersionUpdate('latest');
+                  }
+                  
+                  // Notify the parent component to refresh steps
+                  if (onStepsChange) {
+                    onStepsChange();
+                  }
+                  
+                  toast.success('Step updated successfully');
+                  setIsEditDialogOpen(false);
+                  setActiveStep(null);
+                  
+                  // Also refresh the router
+                  router.refresh();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              onCancel={() => setIsEditDialogOpen(false)}
+              isSubmitting={isLoading}
+              initialData={{ 
+                action: activeStep.action || '', 
+                data: activeStep.data || '', 
+                expected: activeStep.expected || '', 
+                playwrightScript: activeStep.playwrightScript || '',
+                fixtureId: activeStep.fixtureId || ''
+              }}
+              title="Update Step"
+              isFixture={isFixture}
+              fixtures={fixtures}
+            />
+          )}
         </DialogContent>
       </Dialog>
       

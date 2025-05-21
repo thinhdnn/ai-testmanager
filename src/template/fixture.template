@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Page, expect, BrowserContext, Browser } from '@playwright/test';
 
 /**
  * {{name}} {{type}} fixture
@@ -7,50 +7,41 @@ import { Page, expect } from '@playwright/test';
  * {{/if}}
  */
 
-{{!-- ===== TYPE: EXTEND (auto-run logic when fixture injected) ===== --}}
 {{#if (eq type "extend")}}
-export const {{exportName}}Fixture = {
-  {{exportName}}: async ({ page }: { page: Page }, use) => {
-    {{{content}}}
-    await use(true);
-  }
+
+/**
+ * Type definition for fixture
+ */
+export type {{capitalize exportName}}Type = {
+  {{exportName}}: boolean;
 };
 
-{{!-- ===== TYPE: EXTENDPAGE (inject page after setup) ===== --}}
-{{else if (eq type "extendPage")}}
-export const {{exportName}}Fixture = {
-  {{exportName}}: async ({ page }: { page: Page }, use) => {
-    async function setup(): Promise<void> {
-      {{{content}}}
-    }
-
-    await setup();
-    await use(page);
-  }
+/**
+ * Fixture uses page context
+ */
+export const {{exportName}} = async ({ page, context, browser }: { page: Page; context: BrowserContext; browser: Browser }, use: (value: boolean) => Promise<void>) => {
+  {{{content}}}
+  await use(true);
 };
 
-{{!-- ===== TYPE: INLINE (manual function call) ===== --}}
+/**
+ *  Fixture in base.extend()
+ */
+export const {{exportName}}Fixture = {
+  {{exportName}},
+};
+
 {{else if (eq type "inline")}}
+
+/**
+ * Inline page
+ */
 export async function {{exportName}}(page: Page): Promise<void> {
   {{{content}}}
 }
 
-{{!-- ===== TYPE: INLINEEXTEND (combines inline function with extend pattern) ===== --}}
-{{else if (eq type "inlineExtend")}}
-export async function {{exportName}}(page: Page): Promise<void> {
-  {{{content}}}
-}
-
-export const {{exportName}}Fixture = {
-  {{exportName}}: async ({}, use) => {
-    await use({{exportName}});
-  }
-};
-
-{{!-- ===== DEFAULT (fallback) ===== --}}
 {{else}}
-// No valid type provided
-console.warn("Unsupported fixture type: '{{type}}'");
+// Unsupported fixture type '{{type}}'
 {{/if}}
 
 export { expect };
