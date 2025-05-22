@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -105,35 +105,46 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
   ], []);
 
   // Initialize form with default values or existing test case
+  const defaultValues = useMemo(() => ({
+    name: testCase?.name || '',
+    status: testCase?.status || 'pending',
+    isManual: testCase?.isManual || false,
+    tags: '',  // Initialize empty and set separately to avoid loops
+  }), [testCase?.name, testCase?.status, testCase?.isManual]);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: testCase?.name || '',
-      status: testCase?.status || 'pending',
-      isManual: testCase?.isManual || false,
-      tags: Array.isArray(testCase?.tags) ? testCase.tags.join(',') : '', // Handle both array and string
-    },
+    defaultValues,
   });
 
-  // Initialize selected tags from form value
+  // One-time initialization of form and selectedTags
   useEffect(() => {
-    if (testCase?.tags) {
-      try {
-        // Handle the case when tags is already an array
-        if (Array.isArray(testCase.tags)) {
-          setSelectedTags(testCase.tags);
-        } 
-        // Handle the case when tags is a string
-        else if (typeof testCase.tags === 'string') {
-          const tagsArray = testCase.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean);
-          setSelectedTags(tagsArray);
-        }
-      } catch (error) {
-        console.error('Error parsing tags:', error);
-        setSelectedTags([]);
+    if (!testCase) return;
+    
+    try {
+      let tagsArray: string[] = [];
+      
+      // Handle the case when tags is already an array
+      if (Array.isArray(testCase.tags)) {
+        tagsArray = testCase.tags;
+      } 
+      // Handle the case when tags is a string
+      else if (typeof testCase.tags === 'string' && testCase.tags) {
+        tagsArray = testCase.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean);
       }
+      
+      // Set tags in state once
+      setSelectedTags(tagsArray);
+      
+      // Set form value once
+      if (tagsArray.length > 0) {
+        form.setValue('tags', tagsArray.join(','), { shouldDirty: false });
+      }
+      
+    } catch (error) {
+      console.error('Error processing testCase tags:', error);
     }
-  }, [testCase]);
+  }, [testCase, form]);
 
   // Fetch tag options only once when component mounts
   useEffect(() => {
@@ -154,64 +165,70 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
       } catch (error) {
         console.error('Error fetching tags:', error);
         if (isMounted) {
-        setTagOptions(defaultTagOptions);
+          setTagOptions(defaultTagOptions);
         }
       }
     }
 
-      fetchTags();
+    fetchTags();
     
     // Cleanup function to prevent setting state on unmounted component
     return () => {
       isMounted = false;
     };
-  }, [projectId, defaultTagOptions]); // Only re-run if projectId changes
-
-  // Update form value when selected tags change
-  useEffect(() => {
-    // Update the form with the joined tags string
-    const tagsString = selectedTags.join(',');
-    form.setValue('tags', tagsString);
-    console.log('Updated form tags value:', tagsString);
-  }, [selectedTags, form]);
-
-  // Handle adding a tag
-  const handleAddTag = useCallback((tag: string) => {
-    const trimmedTag = tag.trim();
-    if (trimmedTag && !selectedTags.includes(trimmedTag)) {
-      setSelectedTags(prev => [...prev, trimmedTag]);
-      setTagInput('');
-      
-      // Add to tag options if it doesn't exist
-      if (!tagOptions.some(option => option.value === trimmedTag)) {
-        // Create a new tag in the project
-        createProjectTag(trimmedTag);
-      }
-    }
-  }, [selectedTags, tagOptions]);
+  }, [projectId]); // Remove testCaseService from dependency array since it's stable
 
   // Create a new project tag
   const createProjectTag = useCallback(async (tagValue: string) => {
     try {
       const newTag = await testCaseService.createProjectTag(projectId, tagValue);
-        console.log('New tag created:', newTag);
-        
-        // Update tag options with the new tag
-        setTagOptions(prev => {
-          if (prev.some(t => t.value === newTag.value)) {
-            return prev;
-          }
-          return [...prev, newTag];
-        });
+      console.log('New tag created:', newTag);
+      
+      // Update tag options with the new tag
+      setTagOptions(prev => {
+        if (prev.some(t => t.value === newTag.value)) {
+          return prev;
+        }
+        return [...prev, newTag];
+      });
     } catch (error) {
       console.error('Error creating tag:', error);
     }
   }, [projectId, testCaseService]);
 
-  // Handle removing a tag
+  // Handle adding a tag - use function reference stability
+  const handleAddTag = useCallback((tag: string) => {
+    const trimmedTag = tag.trim();
+    if (!trimmedTag || selectedTags.includes(trimmedTag)) return;
+    
+    // Batch state updates to minimize renders
+    setSelectedTags(prev => {
+      const newTags = [...prev, trimmedTag];
+      // Update form value directly here to avoid the separate useEffect
+      const tagsString = newTags.join(',');
+      form.setValue('tags', tagsString, { shouldDirty: true });
+      return newTags;
+    });
+    
+    setTagInput('');
+    
+    // Add to tag options if it doesn't exist
+    if (!tagOptions.some(option => option.value === trimmedTag)) {
+      // Create a new tag in the project
+      createProjectTag(trimmedTag);
+    }
+  }, [selectedTags, tagOptions, createProjectTag, form]);
+
+  // Handle removing a tag - use function reference stability
   const handleRemoveTag = useCallback((tag: string) => {
-    setSelectedTags(prev => prev.filter(t => t !== tag));
-  }, []);
+    setSelectedTags(prev => {
+      const newTags = prev.filter(t => t !== tag);
+      // Update form value directly here to avoid the separate useEffect
+      const tagsString = newTags.join(',');
+      form.setValue('tags', tagsString, { shouldDirty: true });
+      return newTags;
+    });
+  }, [form]);
 
   // Handle tag input key down
   const handleTagInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {

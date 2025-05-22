@@ -357,6 +357,12 @@ export function TestCaseTable({
       // Use the service instead of direct fetch
       const clonedTestCase = await testCaseService.cloneTestCase(projectId, testCase.id);
       
+      console.log('Cloned test case response:', clonedTestCase);
+      
+      if (!clonedTestCase || !clonedTestCase.id) {
+        throw new Error('Invalid response: missing test case ID');
+      }
+      
       toast.success('Test case cloned successfully');
       
       // Navigate to the new cloned test case

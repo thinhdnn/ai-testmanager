@@ -37,73 +37,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { RunTestDialog } from '@/components/test-case/run-test-dialog';
-
-interface Props {
-  params: {
-    id: string;
-    testCaseId: string;
-  };
-}
-
-// Define interfaces for the test case versions and results
-interface TestCaseVersion {
-  id: string;
-  version: string;
-  testCaseId: string;
-  name: string;
-  createdAt: Date;
-  stepVersions?: any[]; // Include the stepVersions property
-  createdBy?: string;
-}
-
-// Using the imported TestResult type from @prisma/client
-interface TestResultData {
-  id: string;
-  testCaseId: string;
-  status: string;
-  success: boolean;
-  executionTime: number | null;
-  createdAt: Date;
-}
-
-interface Project {
-  id: string;
-  name: string;
-}
-
-interface TestCase {
-  id: string;
-  name: string;
-  status: string;
-  version: string;
-  isManual: boolean;
-  tags: string | null;
-  updatedAt: Date;
-  lastRun: Date | null;
-  Steps: Array<{
-    id: string;
-    order: number;
-    action: string;
-    expected: string;
-    data: string | null;
-    disabled: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-    testCaseId: string;
-  }>;
-}
-
-// Add interface for step versions
-interface StepVersion {
-  id: string;
-  action: string;
-  data: string | null;
-  expected: string | null;
-  order: number;
-  disabled: boolean;
-  testCaseVersionId: string;
-  createdAt: Date;
-}
+import { 
+  Project, 
+  TestCase, 
+  TestCaseVersion, 
+  TestResult, 
+  StepVersion,
+  TestCaseDetailPageProps 
+} from '@/types';
+import { ProjectService, TestCaseService } from '@/lib/api/services';
 
 export default function TestCaseDetailPage() {
   const params = useParams();
@@ -116,7 +58,7 @@ export default function TestCaseDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [testCase, setTestCase] = useState<TestCase | null>(null);
   const [versions, setVersions] = useState<TestCaseVersion[]>([]);
-  const [testResults, setTestResults] = useState<TestResultData[]>([]);
+  const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isViewVersionDialogOpen, setIsViewVersionDialogOpen] = useState(false);
   const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
   const [activeVersion, setActiveVersion] = useState<TestCaseVersion | null>(null);
@@ -124,6 +66,27 @@ export default function TestCaseDetailPage() {
   const [isReverting, setIsReverting] = useState(false);
   const [activeTab, setActiveTab] = useState('steps');
   const [isRunTestDialogOpen, setIsRunTestDialogOpen] = useState(false);
+  
+  // Khởi tạo service
+  const projectService = new ProjectService();
+  const testCaseService = new TestCaseService();
+  
+  const convertApiTestResult = (apiResult: any): TestResult => {
+    return {
+      id: apiResult.id,
+      projectId: apiResult.projectId,
+      testCaseId: apiResult.testCaseId,
+      status: apiResult.status,
+      success: apiResult.success,
+      executionTime: apiResult.executionTime,
+      createdAt: apiResult.createdAt,
+      output: apiResult.output || null,
+      errorMessage: apiResult.errorMessage || null,
+      resultData: apiResult.resultData || null,
+      browser: apiResult.browser || null,
+      videoUrl: apiResult.videoUrl || null,
+    } as TestResult;
+  };
   
   const refreshTestCaseData = async () => {
     try {
@@ -164,47 +127,45 @@ export default function TestCaseDetailPage() {
     loadData();
   }, [projectId, testCaseId]);
   
-  // API fetch functions - now with relative URLs for client components
+  // API fetch functions using services
   async function fetchProject(projectId: string): Promise<Project | null> {
-    const res = await fetch(`/api/projects/${projectId}`);
-    
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      throw new Error('Failed to fetch project');
+    try {
+      return await projectService.getProject(projectId);
+    } catch (error) {
+      console.error('Error fetching project:', error);
+      return null;
     }
-    
-    return res.json();
   }
 
   async function fetchTestCase(testCaseId: string): Promise<TestCase | null> {
-    const res = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}`);
-    
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      throw new Error('Failed to fetch test case');
+    try {
+      return await testCaseService.getTestCase(projectId, testCaseId);
+    } catch (error) {
+      console.error('Error fetching test case:', error);
+      if ((error as any)?.message?.includes('404')) {
+        return null;
+      }
+      throw error;
     }
-    
-    return res.json();
   }
 
   async function fetchTestCaseVersions(testCaseId: string): Promise<TestCaseVersion[]> {
-    const res = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}/versions`);
-    
-    if (!res.ok) {
-      throw new Error('Failed to fetch test case versions');
+    try {
+      return await testCaseService.getTestCaseVersions(projectId, testCaseId);
+    } catch (error) {
+      console.error('Error fetching test case versions:', error);
+      return [];
     }
-    
-    return res.json();
   }
 
-  async function fetchTestResults(testCaseId: string): Promise<TestResultData[]> {
-    const res = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}/results`);
-    
-    if (!res.ok) {
-      throw new Error('Failed to fetch test results');
+  async function fetchTestResults(testCaseId: string): Promise<TestResult[]> {
+    try {
+      const apiResults = await testCaseService.getTestResults(projectId, testCaseId);
+      return apiResults.map(result => convertApiTestResult(result));
+    } catch (error) {
+      console.error('Error fetching test results:', error);
+      return [];
     }
-    
-    return res.json();
   }
   
   // Status display helper
@@ -249,14 +210,12 @@ export default function TestCaseDetailPage() {
     
     // Otherwise fetch step versions
     try {
-      const stepVersionsRes = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}/versions/${version.id}/steps`);
-      if (stepVersionsRes.ok) {
-        const stepVersionsData = await stepVersionsRes.json();
-        setVersionSteps(stepVersionsData);
-      } else {
-        console.error('Failed to fetch step versions');
-        setVersionSteps([]);
-      }
+      const stepVersionsData = await testCaseService.getTestCaseVersionSteps(
+        projectId, 
+        testCaseId, 
+        version.id
+      );
+      setVersionSteps(stepVersionsData);
       setIsViewVersionDialogOpen(true);
     } catch (error) {
       console.error('Error fetching step versions:', error);
@@ -271,30 +230,20 @@ export default function TestCaseDetailPage() {
     try {
       setIsReverting(true);
       
-      const response = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}/revert/${activeVersion.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectId,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to revert test case');
-      }
-      
-      const data = await response.json();
+      // Sử dụng service để revert
+      const updatedTestCase = await testCaseService.revertTestCase(
+        projectId, 
+        testCaseId, 
+        activeVersion.id
+      );
       
       toast.success('Test case reverted successfully');
       setIsRevertDialogOpen(false);
       setIsViewVersionDialogOpen(false);
       
       // Update the test case data
-      if (data.testCase) {
-        setTestCase(data.testCase);
+      if (updatedTestCase) {
+        setTestCase(updatedTestCase);
       }
       
       // Reload the page to show the reverted version
@@ -304,6 +253,26 @@ export default function TestCaseDetailPage() {
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setIsReverting(false);
+    }
+  };
+
+  // Function to clone test case
+  const handleClone = async () => {
+    try {
+      const clonedTestCase = await testCaseService.cloneTestCase(projectId, testCaseId);
+      
+      console.log('Cloned test case response:', clonedTestCase);
+      
+      if (!clonedTestCase || !clonedTestCase.id) {
+        throw new Error('Invalid response: missing test case ID');
+      }
+      
+      toast.success('Test case cloned successfully');
+      
+      router.push(`/projects/${projectId}/test-cases/${clonedTestCase.id}`);
+    } catch (error) {
+      console.error('Error cloning test case:', error);
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred while cloning');
     }
   };
 
@@ -377,30 +346,7 @@ export default function TestCaseDetailPage() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={async () => {
-                  try {
-                    const response = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}/clone`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      }
-                    });
-                    
-                    if (!response.ok) {
-                      const errorData = await response.json();
-                      throw new Error(errorData.error || 'Failed to clone test case');
-                    }
-                    
-                    const data = await response.json();
-                    toast.success('Test case cloned successfully');
-                    
-                    // Navigate to the new test case
-                    router.push(`/projects/${projectId}/test-cases/${data.testCase.id}`);
-                  } catch (error) {
-                    console.error('Error cloning test case:', error);
-                    toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
-                  }
-                }}
+                onClick={handleClone}
               >
                 <Copy className="mr-2 h-4 w-4" />
                 Clone
@@ -433,7 +379,8 @@ export default function TestCaseDetailPage() {
             
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-1">Tags</h3>
-              {renderTags(testCase.tags) || <span className="text-muted-foreground">No tags</span>}
+              {renderTags(typeof testCase.tags === 'string' ? testCase.tags : testCase.tags?.join(',') || null) || 
+                <span className="text-muted-foreground">No tags</span>}
             </div>
             
             <div>

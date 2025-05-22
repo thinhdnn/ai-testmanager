@@ -8,9 +8,9 @@ export interface TestCase {
   description?: string;
   status: string;
   priority: string;
-  version: number;
+  version: number | string;
   isManual: boolean;
-  tags: string[];
+  tags: string[] | string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
   createdBy?: string;
@@ -44,7 +44,7 @@ export interface TestCaseVersion {
   id: string;
   testCaseId: string;
   name: string;
-  version: number;
+  version: number | string;
   changes?: string;
   createdAt: string | Date;
   createdBy?: string;
@@ -69,6 +69,7 @@ export interface StepVersion {
 
 export interface TestResult {
   id: string;
+  projectId?: string;
   testCaseId: string;
   status: string;
   success: boolean;
@@ -78,6 +79,11 @@ export interface TestResult {
   screenshot?: string;
   video?: string;
   createdBy?: string;
+  output?: string | null;
+  errorMessage?: string | null;
+  resultData?: string | null;
+  browser?: string | null;
+  videoUrl?: string | null;
 }
 
 export interface TestCaseFormValues {
@@ -92,4 +98,11 @@ export interface TestCaseFormValues {
 export interface TestCasesResponse {
   testCases: TestCase[];
   pagination: PaginationData;
+}
+
+export interface TestCaseDetailPageProps {
+  params: {
+    id: string;
+    testCaseId: string;
+  };
 } 

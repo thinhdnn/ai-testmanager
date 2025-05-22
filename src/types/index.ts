@@ -42,4 +42,11 @@ export interface FixturePageProps {
     search?: string;
     type?: string;
   };
+}
+
+export interface EditTestCasePageProps {
+  params: {
+    id: string;
+    testCaseId: string;
+  };
 } 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, notFound } from 'next/navigation';
 import { TestCaseForm } from '@/components/test-case/test-case-form';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +14,8 @@ import {
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { TestCase, EditTestCasePageProps } from '@/types';
+import { TestCaseService } from '@/lib/api/services';
 
 // Inline Skeleton component to avoid import issues
 function Skeleton({
@@ -28,35 +30,11 @@ function Skeleton({
   )
 }
 
-// Define TestCase interface directly to remove the dependency on @/types
-interface TestCase {
-  id: string;
-  name: string;
-  status: string;
-  version: string;
-  isManual: boolean;
-  tags: string | null;
-  updatedAt: string | Date;
-  lastRun: string | Date | null;
-  createdAt: string | Date;
-  projectId: string;
-  Steps?: Array<{
-    id: string;
-    order: number;
-    action: string;
-    expected: string | null;
-    data: string | null;
-    disabled: boolean;
-    createdAt: string | Date;
-    updatedAt: string | Date;
-    testCaseId: string;
-  }>;
-}
-
 export default function EditTestCasePage() {
   const params = useParams();
   const projectId = params.id as string;
   const testCaseId = params.testCaseId as string;
+  const testCaseService = useMemo(() => new TestCaseService(), []);
   
   const [testCase, setTestCase] = useState<TestCase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,18 +44,15 @@ export default function EditTestCasePage() {
     async function fetchTestCase() {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            notFound();
-          }
-          throw new Error('Failed to fetch test case');
-        }
-        
-        const data = await response.json();
+        const data = await testCaseService.getTestCase(projectId, testCaseId);
         setTestCase(data);
       } catch (err: any) {
+        console.error('Error fetching test case:', err);
+        
+        if (err.message && err.message.includes('404')) {
+          notFound();
+        }
+        
         setError(err.message || 'An error occurred');
       } finally {
         setIsLoading(false);
@@ -85,7 +60,7 @@ export default function EditTestCasePage() {
     }
     
     fetchTestCase();
-  }, [projectId, testCaseId]);
+  }, [projectId, testCaseId, testCaseService]);
   
   if (error) {
     return (

@@ -195,9 +195,43 @@ export class TestCaseService {
   }
 
   async cloneTestCase(projectId: string, testCaseId: string): Promise<TestCase> {
-    const response = await this.apiClient.post<TestCase>(
-      `/projects/${projectId}/test-cases/${testCaseId}/clone`,
-      {}
+    try {
+      console.log(`[TestCaseService] Cloning test case ${testCaseId} in project ${projectId}`);
+      const response = await this.apiClient.post<any>(
+        `/projects/${projectId}/test-cases/${testCaseId}/clone`,
+        {}
+      );
+      
+      console.log('[TestCaseService] Clone response:', response);
+      
+      if (!response) {
+        console.error('[TestCaseService] Empty response received from API');
+        throw new Error('Empty response received from API');
+      }
+      
+      if (!response.testCase && !response.id) {
+        console.error('[TestCaseService] Invalid response format:', response);
+        throw new Error('Invalid response format from clone API');
+      }
+      
+      // Handle both response formats - direct object or nested in testCase property
+      const testCase = response.testCase || response;
+      
+      if (!testCase.id) {
+        console.error('[TestCaseService] Missing ID in response:', testCase);
+        throw new Error('Invalid response: missing test case ID');
+      }
+      
+      return testCase as TestCase;
+    } catch (error) {
+      console.error('[TestCaseService] Clone error:', error);
+      throw error;
+    }
+  }
+
+  async getTestCaseVersionSteps(projectId: string, testCaseId: string, versionId: string): Promise<any[]> {
+    const response = await this.apiClient.get<any[]>(
+      `/projects/${projectId}/test-cases/${testCaseId}/versions/${versionId}/steps`
     );
     return response;
   }
