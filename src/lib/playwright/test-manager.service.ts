@@ -89,6 +89,7 @@ export class TestManagerService {
         name: fixture.name,
         path: fixture.fixtureFilePath || '',
         mode: fixture.type as 'extend' | 'inline',
+        exportName: fixture.exportName
       })),
       steps: testCase.Steps.map(step => ({
         order: step.order,

@@ -125,6 +125,7 @@ export class PlaywrightService {
       name: string;
       path: string;
       mode: 'extend' | 'inline';
+      exportName: string;
     }>;
     steps: Array<{
       order: number;

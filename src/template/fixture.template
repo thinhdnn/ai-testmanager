@@ -12,7 +12,7 @@ import { Page, expect, BrowserContext, Browser } from '@playwright/test';
 /**
  * Type definition for fixture
  */
-export type {{capitalize exportName}}Type = {
+export type {{exportName}}Type = {
   {{exportName}}: boolean;
 };
 

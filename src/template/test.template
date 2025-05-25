@@ -6,7 +6,7 @@ test('{{testCaseName}}', {
   tag: [{{#each tags}}'@{{this}}'{{#unless @last}}, {{/unless}}{{/each}}],
 }, async (
   {{#if (any fixtures "mode" "extend")}}
-    { page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }
+    { page{{#each fixtures}}{{#if (eq mode "extend")}}, {{exportName}}{{/if}}{{/each}} }
   {{else}}
     { page }
   {{/if}}
@@ -14,7 +14,7 @@ test('{{testCaseName}}', {
 {{else}}
 test('{{testCaseName}}', async (
   {{#if (any fixtures "mode" "extend")}}
-    { page{{#each fixtures}}{{#if (eq mode "extend")}}, {{name}}{{/if}}{{/each}} }
+    { page{{#each fixtures}}{{#if (eq mode "extend")}}, {{exportName}}{{/if}}{{/each}} }
   {{else}}
     { page }
   {{/if}}
