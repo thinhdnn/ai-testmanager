@@ -33,7 +33,6 @@ interface ConfigurationSettings {
     screenshot?: string;
     trace?: string;
   };
-  testFilePath?: string;
   useReadableNames?: boolean;
 }
 
@@ -256,6 +255,19 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
   }
   
   function generateCommand() {
+    let envVars = '';
+
+    // Add environment variables if configured
+    if (config.browser?.baseURL) {
+      envVars += `BASE_URL=${config.browser.baseURL} `;
+    }
+    if (config.browser?.video) {
+      envVars += `VIDEO_MODE=${config.browser.video} `;
+    }
+    if (config.browser?.screenshot) {
+      envVars += `SCREENSHOT_MODE=${config.browser.screenshot} `;
+    }
+
     let baseCommand = 'npx playwright test';
     
     // Add the appropriate file pattern based on mode
@@ -292,7 +304,10 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
       baseCommand += ` --workers=${config.playwright.workers}`;
     }
     
-    setCommand(baseCommand);
+    // Combine env vars with command
+    const finalCommand = envVars + baseCommand;
+    
+    setCommand(finalCommand);
   }
   
   function handleCopyCommand() {
@@ -670,7 +685,6 @@ function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogPr
   const [editedConfig, setEditedConfig] = useState<ConfigurationSettings>({
     playwright: { ...config.playwright },
     browser: { ...config.browser },
-    testFilePath: config.testFilePath || 'tests/',
     useReadableNames: config.useReadableNames || true
   });
   
@@ -678,7 +692,6 @@ function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogPr
     setEditedConfig({
       playwright: { ...config.playwright },
       browser: { ...config.browser },
-      testFilePath: config.testFilePath || 'tests/',
       useReadableNames: config.useReadableNames || true
     });
   }, [config]);
@@ -702,33 +715,10 @@ function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogPr
       }
     }));
   };
-
-  const handleTestPathChange = (value: string) => {
-    setEditedConfig(prev => ({
-      ...prev,
-      testFilePath: value
-    }));
-  };
   
   return (
     <div className="py-4">
       <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-medium">Test Path</h3>
-          <div className="space-y-2 mt-2">
-            <Label htmlFor="testFilePath">Test File Path</Label>
-            <Input
-              id="testFilePath"
-              value={editedConfig.testFilePath || 'tests/'}
-              onChange={(e) => handleTestPathChange(e.target.value)}
-              placeholder="tests/"
-            />
-            <p className="text-sm text-muted-foreground">
-              Specify a directory (tests/) or exact file path (tests/user-login.spec.ts)
-            </p>
-          </div>
-        </div>
-        
         <div>
           <h3 className="text-lg font-medium">Playwright Settings</h3>
           <div className="grid grid-cols-2 gap-4 mt-2">
@@ -783,7 +773,7 @@ function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogPr
         
         <div>
           <h3 className="text-lg font-medium">Browser Settings</h3>
-          <div className="grid grid-cols-3 gap-4 mt-4">
+          <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="video">Video</Label>
               <Select 
@@ -813,22 +803,6 @@ function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogPr
                   <SelectItem value="off">Off</SelectItem>
                   <SelectItem value="on">On</SelectItem>
                   <SelectItem value="only-on-failure">Only on failure</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="trace">Trace</Label>
-              <Select 
-                value={editedConfig.browser?.trace || 'off'}
-                onValueChange={(value) => handleBrowserChange('trace', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Trace" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="off">Off</SelectItem>
-                  <SelectItem value="on">On</SelectItem>
-                  <SelectItem value="retain-on-failure">Retain on failure</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -57,6 +57,26 @@ export class PlaywrightService {
     });
   }
 
+  private async updatePlaywrightConfig(projectPath: string) {
+    const configPath = path.join(projectPath, 'playwright.config.ts');
+    
+    // Read existing config file
+    const content = await fs.readFile(configPath, 'utf8');
+    
+    // Replace or add the use configuration
+    const updatedContent = content.replace(
+      /use:\s*{[^}]*}/,
+      `use: {
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+    video: (process.env.VIDEO_MODE) as any || 'off',
+    screenshot: (process.env.SCREENSHOT_MODE) as any || 'off',
+    trace: 'on-first-retry'
+  }`
+    );
+
+    await fs.writeFile(configPath, updatedContent, 'utf8');
+  }
+
   async createPlaywrightProject(projectId: string, projectName: string): Promise<string> {
     try {
       // Create base directory if it doesn't exist
@@ -83,6 +103,9 @@ export class PlaywrightService {
       
       // Create index.ts in fixtures folder using our template
       await this.updateFixturesIndexFile(path.join(projectPath, 'fixtures'), []);
+
+      // Update playwright.config.ts with custom configuration
+      await this.updatePlaywrightConfig(projectPath);
 
       return projectPath;
     } catch (error: any) {
