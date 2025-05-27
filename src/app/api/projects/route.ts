@@ -124,9 +124,9 @@ export async function POST(request: NextRequest) {
       // Create default configuration settings
       const defaultSettings = [
         // Playwright settings
-        { category: 'playwright', key: 'timeout', value: '30000' },
+        { category: 'playwright', key: 'timeout', value: '3000' },
         { category: 'playwright', key: 'expectTimeout', value: '5000' },
-        { category: 'playwright', key: 'retries', value: '2' },
+        { category: 'playwright', key: 'retries', value: '1' },
         { category: 'playwright', key: 'workers', value: '1' },
         { category: 'playwright', key: 'fullyParallel', value: 'false' },
         

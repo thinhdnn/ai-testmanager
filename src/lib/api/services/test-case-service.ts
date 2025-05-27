@@ -1,6 +1,25 @@
 import { ApiClient } from '../api-client';
 import { TestCase, TestCaseVersion, Step, TestResult } from '../interfaces';
 
+interface RunTestRequest {
+  command: string;
+  mode: 'file' | 'list' | 'project';
+  testCaseId?: string | null;
+  testCaseIds?: string[];
+  browser: string;
+  headless: boolean;
+  config: any;
+  testFilePath: string;
+  useReadableNames?: boolean;
+  waitForResult?: boolean;
+}
+
+interface RunTestResponse {
+  message: string;
+  testResultId: string;
+  result?: TestResult;
+}
+
 export class TestCaseService {
   private apiClient: ApiClient;
 
@@ -123,22 +142,21 @@ export class TestCaseService {
     return result;
   }
 
-  async runTest(projectId: string, options: {
-    command: string;
-    mode: 'file' | 'list' | 'project';
-    testCaseId?: string | null;
-    testCaseIds?: string[];
-    browser: string;
-    headless: boolean;
-    config: any;
-    testFilePath: string;
-    useReadableNames?: boolean;
-  }): Promise<{ testResultId: string }> {
-    const response = await this.apiClient.post<{ testResultId: string }>(
-      `/projects/${projectId}/run-test`,
-      options
-    );
-    return response;
+  async runTest(projectId: string, request: RunTestRequest): Promise<RunTestResponse> {
+    const response = await fetch(`/api/projects/${projectId}/run-test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to run test');
+    }
+
+    return response.json();
   }
 
   async getTestCaseSteps(projectId: string, testCaseId: string): Promise<Step[]> {

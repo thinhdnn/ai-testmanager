@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/db/prisma';
+import path from 'path';
 
 // Convert exec to a Promise-based function
 const execAsync = promisify(exec);
@@ -21,7 +22,6 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // With Next.js 15, params need to be awaited
     const { id } = await params;
     const projectId = id;
     
@@ -34,7 +34,8 @@ export async function POST(
       browser, 
       config, 
       testFilePath,
-      useReadableNames = false  // Default to false if not provided
+      useReadableNames = false,
+      waitForResult = false  // New parameter to control execution mode
     } = data;
 
     // Get current project
@@ -46,99 +47,184 @@ export async function POST(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
-    // Execute the command in a child process
-    console.log(`Executing command: ${command}`);
-    console.log(`Test file path: ${testFilePath || 'tests/'}`);
-    
-    // Start test execution in the background
-    const childProcess = exec(command, { 
-      maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+    if (!project.playwrightProjectPath) {
+      return NextResponse.json({ error: 'Playwright project path not configured' }, { status: 400 });
+    }
+
+    // Convert relative project path to absolute path
+    const appRoot = process.cwd();
+    const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
+
+    // Create a test result history entry first
+    let testResult = await prisma.testResultHistory.create({
+      data: {
+        projectId: projectId,
+        testCaseId: mode === 'file' ? testCaseId : null,
+        status: 'running',
+        success: false,
+        browser: browser,
+      },
     });
-    
-    // Create a test result history entry
-    let testResult;
-    if (mode === 'file' && testCaseId) {
-      // Running a single test case
-      testResult = await prisma.testResultHistory.create({
-        data: {
-          projectId: projectId,
-          testCaseId: testCaseId,
-          status: 'running',
-          success: false,
-          browser: browser,
-        },
-      });
+
+    // Function to execute the test and return result
+    const executeTest = () => new Promise<{
+      success: boolean;
+      output: string;
+      errorOutput: string;
+      executionTime: number;
+    }>((resolve, reject) => {
+      let output = '';
+      let errorOutput = '';
+      let testStarted = false;
+      let testCompleted = false;
+      let testPassed = false;
+      let failureDetected = false;
+      const startTime = Date.now();
+
+      try {
+        console.log(`Executing command in directory: ${absoluteProjectPath}`);
+        console.log(`Command: ${command}`);
+
+        const childProcess = exec(command, { 
+          maxBuffer: 1024 * 1024 * 10,
+          cwd: absoluteProjectPath
+        });
+
+        childProcess.stdout?.on('data', (data) => {
+          const text = data.toString();
+          output += text;
+          console.log('Test output:', text);
+
+          if (text.includes('Running 1 test') || text.includes('Running tests')) {
+            testStarted = true;
+          }
+          if (text.includes('1 passed') || text.includes('tests passed')) {
+            testCompleted = true;
+            testPassed = true;
+          }
+          if (text.includes('1 failed') || text.includes('tests failed') || text.includes('Test failed')) {
+            testCompleted = true;
+            failureDetected = true;
+          }
+        });
+
+        childProcess.stderr?.on('data', (data) => {
+          const text = data.toString();
+          errorOutput += text;
+          console.error('Test error:', text);
+        });
+
+        childProcess.on('error', (error) => {
+          reject(error);
+        });
+
+        childProcess.on('exit', (code, signal) => {
+          const executionTime = Date.now() - startTime;
+          if (!testCompleted) {
+            // Test didn't complete normally
+            resolve({
+              success: false,
+              output,
+              errorOutput: `Process ${signal ? `terminated with signal ${signal}` : `exited with code ${code}`}`,
+              executionTime
+            });
+          } else {
+            resolve({
+              success: testPassed,
+              output,
+              errorOutput,
+              executionTime
+            });
+          }
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    if (waitForResult) {
+      try {
+        // Execute test and wait for result
+        const result = await executeTest();
+        
+        // Update test result with final status
+        testResult = await prisma.testResultHistory.update({
+          where: { id: testResult.id },
+          data: {
+            status: 'completed',
+            success: result.success,
+            output: result.output.substring(0, 10000),
+            errorMessage: result.errorOutput || null,
+            executionTime: result.executionTime
+          }
+        });
+
+        // Update test case last run time
+        if (mode === 'file' && testCaseId) {
+          await prisma.testCase.update({
+            where: { id: testCaseId },
+            data: { lastRun: new Date() }
+          });
+        }
+
+        return NextResponse.json({ 
+          message: 'Test execution completed',
+          testResultId: testResult.id,
+          result: testResult
+        });
+      } catch (error) {
+        // Update test result with error status
+        await prisma.testResultHistory.update({
+          where: { id: testResult.id },
+          data: {
+            status: 'failed',
+            success: false,
+            errorMessage: error instanceof Error ? error.message : 'Unknown error'
+          }
+        });
+        throw error;
+      }
     } else {
-      // Running multiple tests or the whole project
-      testResult = await prisma.testResultHistory.create({
-        data: {
-          projectId: projectId,
-          status: 'running',
-          success: false,
-          browser: browser,
-        },
+      // Start test in background
+      executeTest()
+        .then(async (result) => {
+          // Update test result with final status
+          await prisma.testResultHistory.update({
+            where: { id: testResult.id },
+            data: {
+              status: 'completed',
+              success: result.success,
+              output: result.output.substring(0, 10000),
+              errorMessage: result.errorOutput || null,
+              executionTime: result.executionTime
+            }
+          });
+
+          // Update test case last run time
+          if (mode === 'file' && testCaseId) {
+            await prisma.testCase.update({
+              where: { id: testCaseId },
+              data: { lastRun: new Date() }
+            });
+          }
+        })
+        .catch(async (error) => {
+          // Update test result with error status
+          await prisma.testResultHistory.update({
+            where: { id: testResult.id },
+            data: {
+              status: 'failed',
+              success: false,
+              errorMessage: error instanceof Error ? error.message : 'Unknown error'
+            }
+          });
+        });
+
+      return NextResponse.json({ 
+        message: 'Test execution started',
+        testResultId: testResult.id
       });
     }
-    
-    // Handle output from the child process
-    let output = '';
-    let errorOutput = '';
-    
-    childProcess.stdout?.on('data', (data) => {
-      output += data.toString();
-    });
-    
-    childProcess.stderr?.on('data', (data) => {
-      errorOutput += data.toString();
-    });
-    
-    // Update the test result when the process completes
-    childProcess.on('close', async (code) => {
-      console.log(`Command executed with exit code: ${code}`);
-      
-      const success = code === 0;
-      
-      // Update test result
-      await prisma.testResultHistory.update({
-        where: { id: testResult.id },
-        data: {
-          status: success ? 'completed' : 'failed',
-          success: success,
-          output: output.substring(0, 10000), // Limit output size
-          errorMessage: errorOutput.substring(0, 10000), // Limit error output size
-          executionTime: Date.now() - new Date(testResult.createdAt).getTime(), // Duration in ms
-        },
-      });
-      
-      // Also update the lastRun timestamp for the test case
-      if (mode === 'file' && testCaseId) {
-        await prisma.testCase.update({
-          where: { id: testCaseId },
-          data: {
-            lastRun: new Date(),
-          },
-        });
-      }
-      
-      // For list mode, update all test cases
-      if (mode === 'list' && testCaseIds && testCaseIds.length > 0) {
-        await prisma.$transaction(
-          testCaseIds.map((id: string) => 
-            prisma.testCase.update({
-              where: { id },
-              data: { lastRun: new Date() }
-            })
-          )
-        );
-      }
-      
-      console.log(`Test result updated: ${success ? 'Success' : 'Failure'}`);
-    });
-    
-    return NextResponse.json({ 
-      message: 'Test execution started', 
-      testResultId: testResult.id 
-    });
   } catch (error) {
     console.error('Error running test:', error);
     return NextResponse.json(

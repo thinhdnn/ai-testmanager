@@ -56,8 +56,83 @@ interface TestResult {
   output: string | null;
   errorMessage: string | null;
   browser: string | null;
-  video?: string;
-  screenshot?: string;
+  videoUrl?: string | null;
+  screenshot?: string | null;
+  rawReport?: {
+    config: {
+      configFile: string;
+      rootDir: string;
+      forbidOnly: boolean;
+      fullyParallel: boolean;
+      globalSetup: null;
+      globalTeardown: null;
+      globalTimeout: number;
+      grep: Record<string, unknown>;
+      grepInvert: null;
+      maxFailures: number;
+      metadata: {
+        actualWorkers: number;
+      };
+      preserveOutput: string;
+      reporter: Array<[string]>;
+      reportSlowTests: {
+        max: number;
+        threshold: number;
+      };
+      quiet: boolean;
+      projects: Array<{
+        outputDir: string;
+        repeatEach: number;
+        retries: number;
+        metadata: {
+          actualWorkers: number;
+        };
+        id: string;
+        name: string;
+        testDir: string;
+        testIgnore: string[];
+        testMatch: string[];
+        timeout: number;
+      }>;
+      shard: null;
+      updateSnapshots: string;
+      version: string;
+      workers: number;
+      webServer: null;
+    };
+    suites: Array<{
+      title: string;
+      file: string;
+      specs: Array<{
+        title: string;
+        ok: boolean;
+        tags: string[];
+        tests: Array<{
+          projectName: string;
+          results: Array<{
+            status: string;
+            duration: number;
+            errors?: Array<{
+              message: string;
+              location?: {
+                file: string;
+                line: number;
+                column: number;
+              };
+            }>;
+          }>;
+        }>;
+      }>;
+    }>;
+    stats: {
+      startTime: string;
+      duration: number;
+      expected: number;
+      skipped: number;
+      unexpected: number;
+      flaky: number;
+    };
+  };
 }
 
 // Extended TestCase interface with testFilePath property
@@ -81,6 +156,7 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [testCaseData, setTestCaseData] = useState<TestCase | null>(null);
   const [useReadableNames, setUseReadableNames] = useState(true);
+  const [runMode, setRunMode] = useState<'background' | 'wait'>('background');
   const [activeTab, setActiveTab] = useState("logs"); // Default to logs tab
   const testCaseService = new TestCaseService();
   const projectService = new ProjectService();
@@ -182,19 +258,151 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
   // Effect to poll for test result updates
   useEffect(() => {
     if (testResultId && isResultDialogOpen) {
+      let retryCount = 0;
+      const maxRetries = 30;
+      let lastStatus = '';
+      let lastOutput = '';
+      let noChangeCount = 0;
+      const maxNoChange = 10;
+      const startTime = Date.now();
+      const maxTestDuration = 3000;
+
       // First, fetch immediately
       fetchTestResult(testResultId);
       
       // Then set up polling
-      const interval = setInterval(() => {
-        fetchTestResult(testResultId);
-      }, 2000); // Poll every 2 seconds
+      const interval = setInterval(async () => {
+        try {
+          const apiResult = await testCaseService.getTestResult(projectId, testResultId);
+          console.log('Poll result:', {
+            status: apiResult.status,
+            hasOutput: !!apiResult.output,
+            outputLength: apiResult.output?.length || 0,
+            hasError: !!apiResult.errorMessage,
+            executionTime: Date.now() - startTime
+          });
+          
+          // Check if test has been running too long
+          const executionTime = Date.now() - startTime;
+          if (executionTime > maxTestDuration && apiResult.status === 'running') {
+            console.log(`Test execution time ${executionTime}ms exceeded maximum ${maxTestDuration}ms`);
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+              setPollingInterval(null);
+            }
+            setTestResult(prev => prev ? {
+              ...prev,
+              status: 'stalled',
+              errorMessage: 'Test execution exceeded maximum time limit. The process might still be running in the background.'
+            } : null);
+            return;
+          }
+
+          // Check if output has changed
+          const hasNewOutput = apiResult.output !== lastOutput;
+          if (hasNewOutput) {
+            console.log('New output detected');
+            noChangeCount = 0;
+            lastOutput = apiResult.output || '';
+          } else {
+            noChangeCount++;
+            console.log(`No changes for ${noChangeCount} polls`);
+          }
+
+          // For quick tests (< 5s), stop polling if no changes after 3 attempts
+          if (executionTime < 5000 && noChangeCount >= 3 && apiResult.output && apiResult.output.includes('Running 1 test')) {
+            console.log('Quick test detected with no recent changes, stopping polling');
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+              setPollingInterval(null);
+            }
+            // Mark as completed if we have output
+            setTestResult(prev => prev ? {
+              ...prev,
+              status: 'completed',
+              success: !apiResult.errorMessage,
+              executionTime: executionTime
+            } : null);
+            return;
+          }
+
+          // If status hasn't changed and no new output after several retries, consider it stalled
+          if (apiResult.status === lastStatus && !hasNewOutput) {
+            if (noChangeCount >= maxNoChange) {
+              console.log('No changes detected for too long, considering test stalled');
+              if (pollingInterval) {
+                clearInterval(pollingInterval);
+                setPollingInterval(null);
+              }
+
+              // Only update to stalled if test is still running
+              if (apiResult.status === 'running') {
+                setTestResult(prev => prev ? {
+                  ...prev,
+                  status: 'stalled',
+                  errorMessage: 'Test appears to be stalled. The process might still be running but is not producing output.'
+                } : null);
+              }
+              return;
+            }
+          } else {
+            // Reset counts if status changed or new output
+            if (apiResult.status !== lastStatus) {
+              console.log(`Status changed from ${lastStatus} to ${apiResult.status}`);
+              retryCount = 0;
+              lastStatus = apiResult.status;
+            }
+          }
+
+          // Convert API result to component's TestResult format
+          const result: TestResult = {
+            id: apiResult.id,
+            testCaseId: apiResult.testCaseId || null,
+            status: apiResult.status,
+            success: apiResult.success,
+            executionTime: apiResult.executionTime || executionTime,
+            createdAt: new Date(apiResult.createdAt),
+            errorMessage: apiResult.errorMessage || apiResult.error || null,
+            output: apiResult.output || null,
+            browser: apiResult.browser || null,
+            videoUrl: apiResult.videoUrl,
+            screenshot: apiResult.screenshot
+          };
+          
+          setTestResult(result);
+          
+          // Stop polling if test is complete or failed
+          if (result.status === 'completed' || result.status === 'failed') {
+            console.log(`Test ${result.status}, stopping polling`);
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+              setPollingInterval(null);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching test result:', error);
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.log('Max retries reached, stopping polling');
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+              setPollingInterval(null);
+            }
+            setTestResult(prev => prev ? {
+              ...prev,
+              status: 'failed',
+              errorMessage: 'Failed to fetch test results after multiple retries. The test might still be running in the background.'
+            } : null);
+          }
+        }
+      }, 2000);
       
       setPollingInterval(interval);
       
-      // Clean up polling when the dialog closes or testResultId changes
       return () => {
-        clearInterval(interval);
+        if (interval) {
+          clearInterval(interval);
+        }
       };
     }
   }, [testResultId, isResultDialogOpen, projectId]);
@@ -221,7 +429,7 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
         output: apiResult.output || null,
         browser: apiResult.browser || null,
         // Map videoUrl to video for internal component use
-        video: apiResult.videoUrl,
+        videoUrl: apiResult.videoUrl,
         screenshot: apiResult.screenshot
       };
       
@@ -233,7 +441,7 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
         // If we have logs or error messages, show the logs tab
         console.log('Test has output logs or errors, switching to logs tab');
         setActiveTab('logs');
-      } else if (result.video || result.screenshot) {
+      } else if (result.videoUrl || result.screenshot) {
         // If we have media but no logs, show the media tab
         console.log('Test has media, switching to results tab');
         setActiveTab('results');
@@ -303,6 +511,9 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
     if (config.playwright?.workers) {
       baseCommand += ` --workers=${config.playwright.workers}`;
     }
+
+    // Use JSON reporter for structured output
+    baseCommand += ' --reporter=json';
     
     // Combine env vars with command
     const finalCommand = envVars + baseCommand;
@@ -317,10 +528,8 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
   
   async function handleRunTest() {
     try {
-      // Show running state
       toast.loading('Running tests...');
       
-      // Send the command to the backend for execution using service
       const data = await testCaseService.runTest(projectId, {
         command,
         mode,
@@ -330,17 +539,45 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
         headless,
         config,
         testFilePath,
-        useReadableNames
+        useReadableNames,
+        waitForResult: runMode === 'wait'
       });
-      
-      setTestResultId(data.testResultId);
-      
-      toast.dismiss();
-      toast.success('Test run initiated');
-      
-      // Close the run dialog and open the results dialog
-      onClose();
-      setIsResultDialogOpen(true);
+
+      if (runMode === 'wait') {
+        const result = data.result;
+        let parsedReport = null;
+        
+        // Try to parse JSON from output if available
+        if (result?.output) {
+          try {
+            parsedReport = JSON.parse(result.output);
+          } catch (e) {
+            console.error('Failed to parse test output as JSON:', e);
+          }
+        }
+
+        setTestResult(result ? {
+          ...result,
+          createdAt: new Date(result.createdAt),
+          output: result.output || null,
+          errorMessage: result.errorMessage || null,
+          videoUrl: result.videoUrl || null,
+          screenshot: result.screenshot || null,
+          browser: result.browser || null,
+          rawReport: parsedReport
+        } : null);
+        
+        toast.dismiss();
+        toast.success('Test completed');
+        onClose();
+        setIsResultDialogOpen(true);
+      } else {
+        setTestResultId(data.testResultId);
+        toast.dismiss();
+        toast.success('Test run initiated');
+        onClose();
+        setIsResultDialogOpen(true);
+      }
     } catch (error) {
       toast.dismiss();
       console.error('Error running test:', error);
@@ -421,22 +658,32 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
                 <Label htmlFor="headless">Run in headless mode</Label>
               </div>
             </div>
-            
-            {mode === 'file' && testCaseData && (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="text-right">
-                  <Label htmlFor="filename">Filename</Label>
-                </div>
-                <div className="flex items-center space-x-2 col-span-3">
-                  <Checkbox 
-                    id="useReadableNames" 
-                    checked={useReadableNames}
-                    onCheckedChange={(checked) => setUseReadableNames(checked as boolean)}
-                  />
-                  <Label htmlFor="useReadableNames">Use human-readable filenames</Label>
-                </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <div className="text-right">
+                <Label htmlFor="runMode">Run Mode</Label>
               </div>
-            )}
+              <div className="col-span-3">
+                <Select
+                  value={runMode}
+                  onValueChange={(value: 'background' | 'wait') => setRunMode(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select run mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="background">
+                      Run in Background
+                    </SelectItem>
+                    <SelectItem value="wait">
+                      Wait for Result
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+
             
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="command" className="text-right">
@@ -476,7 +723,7 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button onClick={handleRunTest}>
               <PlayCircle className="mr-2 h-4 w-4" />
-              Run Test
+              {runMode === 'background' ? 'Run in Background' : 'Run and Wait'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -506,169 +753,108 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
           <DialogHeader>
             <DialogTitle>Test Results</DialogTitle>
             <DialogDescription>
-              {testResult ? `Test ${testResult.status}` : 'Running test...'}
+              Test completed
             </DialogDescription>
           </DialogHeader>
-          
-          {!testResult || testResult.status === 'running' ? (
-            <div className="flex flex-col items-center justify-center py-10">
-              <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-              <p className="text-lg">Running tests...</p>
-              <p className="text-sm text-muted-foreground mt-2">This might take a moment</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-4 justify-between">
-                <div className="flex items-center gap-2">
-                  {testResult.success ? (
-                    <CheckCircle className="text-green-500 h-6 w-6" />
-                  ) : (
-                    <XCircle className="text-red-500 h-6 w-6" />
-                  )}
-                  <div>
-                    <h3 className="text-lg font-medium">
-                      Test {testResult.success ? 'Passed' : 'Failed'}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {testResult.browser && `Browser: ${testResult.browser}`} • 
-                      {testResult.executionTime && ` Duration: ${(testResult.executionTime / 1000).toFixed(2)}s`} •
-                      Created {formatDistance(new Date(testResult.createdAt), new Date(), { addSuffix: true })}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant={testResult.success ? "default" : "destructive"}>
-                  {testResult.status}
-                </Badge>
-              </div>
-              
-              <div>
-                {/* Custom tabs using our own state management */}
-                <div className="border-b mb-4">
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => setActiveTab('results')}
-                      className={`px-4 py-2 font-medium flex items-center gap-2 ${
-                        activeTab === 'results' 
-                          ? 'border-b-2 border-primary text-primary' 
-                          : 'text-muted-foreground'
-                      }`}
-                    >
-                      <Video className="h-4 w-4" />
-                      <span>Results & Media</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('logs')}
-                      className={`px-4 py-2 font-medium flex items-center gap-2 ${
-                        activeTab === 'logs' 
-                          ? 'border-b-2 border-primary text-primary' 
-                          : 'text-muted-foreground'
-                      }`}
-                    >
-                      <Terminal className="h-4 w-4" />
-                      <span>Logs</span>
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Results tab content */}
-                {activeTab === 'results' && (
-                  <div className="mt-4">
-                    {/* Show video if available */}
-                    {testResult.video && (
-                      <div className="mt-4">
-                        <h4 className="font-medium mb-2">Video Recording</h4>
-                        <div className="bg-black rounded-md overflow-hidden">
-                          <video 
-                            controls 
-                            className="w-full"
-                            src={testResult.video}
-                          >
-                            Your browser does not support the video tag.
-                          </video>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Show screenshot if available */}
-                    {testResult.screenshot && (
-                      <div className="mt-4">
-                        <h4 className="font-medium mb-2">Screenshot</h4>
-                        <div className="border rounded-md overflow-hidden">
-                          <img 
-                            src={testResult.screenshot} 
-                            alt="Test Screenshot" 
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                    )}
 
-                    {/* Add a message if no media is available */}
-                    {!testResult.video && !testResult.screenshot && (
-                      <div className="py-8 text-center text-muted-foreground">
-                        <p>No media files available for this test.</p>
-                        <p className="text-sm mt-1">Configure video recording and screenshots in test settings.</p>
-                      </div>
-                    )}
-                  </div>
+          <div className="space-y-4">
+            {/* Test Status Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {testResult?.success ? (
+                  <CheckCircle className="text-green-500 h-5 w-5" />
+                ) : (
+                  <XCircle className="text-red-500 h-5 w-5" />
                 )}
-                
-                {/* Logs tab content */}
-                {activeTab === 'logs' && (
-                  <div className="mt-4">
-                    {/* Show error message in logs tab */}
-                    {testResult.errorMessage && (
-                      <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-                        <h4 className="text-red-800 font-medium mb-2">Error</h4>
-                        <pre className="text-red-700 text-sm whitespace-pre-wrap overflow-auto max-h-40">
-                          {testResult.errorMessage}
-                        </pre>
-                      </div>
-                    )}
-                  
-                    {testResult.output ? (
-                      <div>
-                        <h4 className="font-medium mb-2">Test Output</h4>
-                        <div className="bg-slate-50 border rounded-md p-4">
-                          <pre className="text-sm text-slate-700 whitespace-pre-wrap overflow-auto max-h-[400px]">
-                            {testResult.output}
-                          </pre>
-                        </div>
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          Log length: {testResult.output?.length} characters
-                        </div>
-                      </div>
-                    ) : !testResult.errorMessage && (
-                      <div className="py-8 text-center text-muted-foreground">
-                        <p>No log output available for this test.</p>
-                        <p className="text-sm mt-2">
-                          Debug info:
-                          {testResult.output === null ? ' output is null' : 
-                           testResult.output === undefined ? ' output is undefined' : 
-                           testResult.output === '' ? ' output is empty string' : 
-                           ` output exists but not showing (${typeof testResult.output})`}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <h3 className="text-lg font-medium">
+                  Test {testResult?.success ? 'Passed' : 'Failed'}
+                </h3>
               </div>
-            </>
-          )}
-          
-          <DialogFooter>
-            {testResult && testResult.output && (
-              <Button 
-                variant="outline" 
-                onClick={() => setActiveTab('logs')}
-                className="mr-auto"
-              >
-                <Terminal className="mr-2 h-4 w-4" />
+              <Badge variant="default" className="bg-red-500">
+                completed
+              </Badge>
+            </div>
+
+            {/* Test Info */}
+            <div className="text-sm text-muted-foreground">
+              Browser: {testResult?.browser || 'chromium'} • 
+              Duration: {testResult?.executionTime ? (testResult.executionTime / 1000).toFixed(2) : '0'}s • 
+              Created {testResult?.createdAt ? formatDistance(new Date(testResult.createdAt), new Date(), { addSuffix: true }) : ''}
+            </div>
+
+            {/* Tabs */}
+            <Tabs defaultValue="results" className="w-full">
+              <TabsList>
+                <TabsTrigger value="results" className="flex items-center gap-2">
+                  <Terminal className="h-4 w-4" />
+                  Results & Media
+                </TabsTrigger>
+                <TabsTrigger value="logs" className="flex items-center gap-2">
+                  <Terminal className="h-4 w-4" />
+                  Logs
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="results" className="mt-4">
+                <div className="rounded-md border">
+                  <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50 border-b text-sm font-medium">
+                    <div className="col-span-6">Test Case</div>
+                    <div className="col-span-3 text-right">Duration</div>
+                    <div className="col-span-3">Status</div>
+                  </div>
+                  {testResult?.rawReport ? (
+                    testResult.rawReport.suites.map((suite, suiteIndex) => (
+                      <React.Fragment key={suiteIndex}>
+                        {suite.specs.map((spec, specIndex) => (
+                          <div key={`${suiteIndex}-${specIndex}`} className="grid grid-cols-12 gap-4 p-4 border-b last:border-0 text-sm items-center hover:bg-slate-50">
+                            <div className="col-span-6 font-medium">
+                              {spec.title}
+                            </div>
+                            <div className="col-span-3 text-right text-muted-foreground">
+                              {spec.tests[0]?.results[0]?.duration ? 
+                                `${(spec.tests[0].results[0].duration / 1000).toFixed(2)}s` : 
+                                'N/A'
+                              }
+                            </div>
+                            <div className="col-span-3">
+                              <Badge 
+                                variant={spec.ok ? "default" : "destructive"}
+                                className="capitalize"
+                              >
+                                {spec.ok ? "Passed" : "Failed"}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-muted-foreground">
+                      No test results available
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="logs" className="mt-4">
+                <div className="rounded-md border bg-slate-50 p-4">
+                  <pre className="text-sm font-mono whitespace-pre-wrap overflow-auto max-h-[500px]">
+                    {testResult?.output || 'No logs available'}
+                  </pre>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setIsResultDialogOpen(false)}>
+                Close
+              </Button>
+              <Button onClick={() => setActiveTab('logs')} variant="default">
                 View Logs
               </Button>
-            )}
-            <Button onClick={() => setIsResultDialogOpen(false)}>Close</Button>
-          </DialogFooter>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
