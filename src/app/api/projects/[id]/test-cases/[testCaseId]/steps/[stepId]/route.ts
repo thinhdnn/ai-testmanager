@@ -8,6 +8,8 @@ import { StepVersionRepository } from '@/lib/db/repositories/step-version-reposi
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { incrementVersion } from '@/lib/utils/version';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import { FixtureVersionRepository } from '@/lib/db/repositories/fixture-version-repository';
+import { FixtureRepository } from '@/lib/db/repositories/fixture-repository';
 
 // GET /api/projects/[id]/test-cases/[testCaseId]/steps/[stepId]
 export async function GET(
@@ -77,19 +79,13 @@ export async function PUT(
     const body = await request.json();
     const { action, data, expected, fixtureId, disabled, order, playwrightScript } = body;
 
-    // Validate required fields
-    if (!action) {
-      return NextResponse.json(
-        { error: 'Action is required' },
-        { status: 400 }
-      );
-    }
-
     // Update step
     const stepRepository = new StepRepository();
     const testCaseRepository = new TestCaseRepository();
     const testCaseVersionRepository = new TestCaseVersionRepository();
     const stepVersionRepository = new StepVersionRepository();
+    const fixtureVersionRepository = new FixtureVersionRepository();
+    const fixtureRepository = new FixtureRepository();
 
     const step = await stepRepository.findById(stepId);
     if (!step) {
@@ -134,9 +130,30 @@ export async function PUT(
       // Create versions for all steps
       if (latestVersion) {
         for (const currentStep of allSteps) {
+          // If the step has a fixture, ensure a fixture version exists
+          let fixtureVersionId;
+          if (currentStep.fixtureId) {
+            const fixture = await fixtureRepository.findById(currentStep.fixtureId);
+            if (fixture) {
+              // Get or create latest fixture version
+              let fixtureVersion = await fixtureVersionRepository.findLatestByFixtureId(currentStep.fixtureId);
+              if (!fixtureVersion) {
+                // Create initial fixture version if none exists
+                fixtureVersion = await fixtureVersionRepository.create({
+                  fixtureId: currentStep.fixtureId,
+                  version: '1.0.0',
+                  name: fixture.name,
+                  playwrightScript: fixture.playwrightScript || undefined,
+                  createdBy: userEmail
+                });
+              }
+              fixtureVersionId = fixtureVersion.id;
+            }
+          }
+
           await stepVersionRepository.create({
             testCaseVersionId: latestVersion.id,
-            fixtureVersionId: currentStep.fixtureId || undefined,
+            fixtureVersionId: fixtureVersionId,
             action: currentStep.action,
             data: currentStep.data || undefined,
             expected: currentStep.expected || undefined,

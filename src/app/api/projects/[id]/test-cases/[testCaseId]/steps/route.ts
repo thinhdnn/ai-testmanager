@@ -72,6 +72,8 @@ export async function POST(
     const testCaseRepository = new TestCaseRepository();
     const testCaseVersionRepository = new TestCaseVersionRepository();
     const stepVersionRepository = new StepVersionRepository();
+    const fixtureVersionRepository = new FixtureVersionRepository();
+    const fixtureRepository = new FixtureRepository();
 
     // Get the test case
     const testCase = await testCaseRepository.findById(testCaseId);
@@ -124,9 +126,30 @@ export async function POST(
     // Create versions for all steps
     if (latestVersion) {
       for (const currentStep of allSteps) {
+        // If the step has a fixture, ensure a fixture version exists
+        let fixtureVersionId;
+        if (currentStep.fixtureId) {
+          const fixture = await fixtureRepository.findById(currentStep.fixtureId);
+          if (fixture) {
+            // Get or create latest fixture version
+            let fixtureVersion = await fixtureVersionRepository.findLatestByFixtureId(currentStep.fixtureId);
+            if (!fixtureVersion) {
+              // Create initial fixture version if none exists
+              fixtureVersion = await fixtureVersionRepository.create({
+                fixtureId: currentStep.fixtureId,
+                version: '1.0.0',
+                name: fixture.name,
+                playwrightScript: fixture.playwrightScript || undefined,
+                createdBy: userEmail
+              });
+            }
+            fixtureVersionId = fixtureVersion.id;
+          }
+        }
+
         await stepVersionRepository.create({
           testCaseVersionId: latestVersion.id,
-          fixtureVersionId: currentStep.fixtureId || undefined,
+          fixtureVersionId: fixtureVersionId,
           action: currentStep.action,
           data: currentStep.data || undefined,
           expected: currentStep.expected || undefined,
