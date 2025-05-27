@@ -682,21 +682,36 @@ interface ConfigurationDialogProps {
 }
 
 function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogProps) {
+  // Convert initial milliseconds to seconds for display
   const [editedConfig, setEditedConfig] = useState<ConfigurationSettings>({
-    playwright: { ...config.playwright },
+    playwright: {
+      ...config.playwright,
+      timeout: config.playwright?.timeout ? String(Number(config.playwright.timeout) / 1000) : '',
+      expectTimeout: config.playwright?.expectTimeout ? String(Number(config.playwright.expectTimeout) / 1000) : ''
+    },
     browser: { ...config.browser },
     useReadableNames: config.useReadableNames || true
   });
   
   useEffect(() => {
     setEditedConfig({
-      playwright: { ...config.playwright },
+      playwright: {
+        ...config.playwright,
+        timeout: config.playwright?.timeout ? String(Number(config.playwright.timeout) / 1000) : '',
+        expectTimeout: config.playwright?.expectTimeout ? String(Number(config.playwright.expectTimeout) / 1000) : ''
+      },
       browser: { ...config.browser },
       useReadableNames: config.useReadableNames || true
     });
   }, [config]);
   
   const handlePlaywrightChange = (key: string, value: string) => {
+    // For timeout fields, validate that the input is a valid number
+    if ((key === 'timeout' || key === 'expectTimeout') && value !== '') {
+      const numValue = Number(value);
+      if (isNaN(numValue) || numValue < 0) return;
+    }
+
     setEditedConfig(prev => ({
       ...prev,
       playwright: {
@@ -715,6 +730,23 @@ function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogPr
       }
     }));
   };
+
+  const handleSave = () => {
+    // Convert seconds back to milliseconds before saving
+    const convertedConfig = {
+      ...editedConfig,
+      playwright: {
+        ...editedConfig.playwright,
+        timeout: editedConfig.playwright?.timeout 
+          ? String(Number(editedConfig.playwright.timeout) * 1000) 
+          : undefined,
+        expectTimeout: editedConfig.playwright?.expectTimeout 
+          ? String(Number(editedConfig.playwright.expectTimeout) * 1000) 
+          : undefined
+      }
+    };
+    onSave(convertedConfig);
+  };
   
   return (
     <div className="py-4">
@@ -723,21 +755,27 @@ function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogPr
           <h3 className="text-lg font-medium">Playwright Settings</h3>
           <div className="grid grid-cols-2 gap-4 mt-2">
             <div className="space-y-2">
-              <Label htmlFor="timeout">Timeout (ms)</Label>
+              <Label htmlFor="timeout">Timeout (seconds)</Label>
               <Input
                 id="timeout"
                 value={editedConfig.playwright?.timeout || ''}
                 onChange={(e) => handlePlaywrightChange('timeout', e.target.value)}
-                placeholder="30000"
+                placeholder="30"
+                type="number"
+                min="0"
+                step="1"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="expectTimeout">Expect Timeout (ms)</Label>
+              <Label htmlFor="expectTimeout">Expect Timeout (seconds)</Label>
               <Input
                 id="expectTimeout"
                 value={editedConfig.playwright?.expectTimeout || ''}
                 onChange={(e) => handlePlaywrightChange('expectTimeout', e.target.value)}
-                placeholder="5000"
+                placeholder="5"
+                type="number"
+                min="0"
+                step="1"
               />
             </div>
             <div className="space-y-2">
@@ -812,7 +850,7 @@ function ConfigurationDialog({ config, onSave, onCancel }: ConfigurationDialogPr
       
       <DialogFooter className="mt-6">
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={() => onSave(editedConfig)}>Temporary Save</Button>
+        <Button onClick={handleSave}>Temporary Save</Button>
       </DialogFooter>
     </div>
   );
