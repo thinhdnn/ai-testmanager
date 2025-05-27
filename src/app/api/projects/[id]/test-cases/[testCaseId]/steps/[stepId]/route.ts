@@ -12,7 +12,7 @@ import { TestManagerService } from '@/lib/playwright/test-manager.service';
 // GET /api/projects/[id]/test-cases/[testCaseId]/steps/[stepId]
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string; stepId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string; stepId: string }> }
 ) {
   try {
     // In Next.js 15, params is a Promise that must be awaited
@@ -52,7 +52,7 @@ export async function GET(
 // PUT /api/projects/[id]/test-cases/[testCaseId]/steps/[stepId]
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string; stepId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string; stepId: string }> }
 ) {
   try {
     // In Next.js 15, params is a Promise that must be awaited
@@ -97,13 +97,13 @@ export async function PUT(
     }
 
     const updatedStep = await stepRepository.update(stepId, {
-      action,
-      data,
-      expected,
-      fixtureId,
-      disabled: typeof disabled === 'boolean' ? disabled : step.disabled,
-      order: typeof order === 'number' ? order : step.order,
-      playwrightScript,
+      action: action || undefined,
+      data: data || undefined,
+      expected: expected || undefined,
+      order: order || undefined,
+      disabled: disabled,
+      fixtureId: fixtureId || undefined,
+      playwrightScript: playwrightScript || undefined,
       updatedBy: userEmail
     });
 
@@ -134,16 +134,16 @@ export async function PUT(
       // Create versions for all steps
       if (latestVersion) {
         for (const currentStep of allSteps) {
-        await stepVersionRepository.create({
-          testCaseVersionId: latestVersion.id,
+          await stepVersionRepository.create({
+            testCaseVersionId: latestVersion.id,
             fixtureVersionId: currentStep.fixtureId || undefined,
             action: currentStep.action,
             data: currentStep.data || undefined,
             expected: currentStep.expected || undefined,
             order: currentStep.order,
             disabled: currentStep.disabled || false,
-          createdBy: userEmail
-        });
+            createdBy: userEmail
+          });
         }
       }
     }
@@ -174,7 +174,7 @@ export async function PUT(
 // DELETE /api/projects/[id]/test-cases/[testCaseId]/steps/[stepId]
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string; stepId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string; stepId: string }> }
 ) {
   try {
     // In Next.js 15, params is a Promise that must be awaited

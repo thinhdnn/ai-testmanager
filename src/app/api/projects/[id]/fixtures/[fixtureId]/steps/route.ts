@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 // GET /api/projects/[id]/fixtures/[fixtureId]/steps
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string }> }
 ) {
   try {
     const resolvedParams = await params;
@@ -72,7 +72,7 @@ export async function GET(
 // Add a new step to the fixture
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string }> }
 ) {
   try {
     const resolvedParams = await params;
@@ -124,10 +124,11 @@ export async function POST(
     const steps = fixtureWithSteps?.steps || [];
     
     // Calculate next order position
-    const maxOrderStep = steps.length > 0 
-      ? steps.reduce((max, step) => step.order > max.order ? step : max, steps[0]) 
-      : null;
-    const nextOrder = maxOrderStep ? maxOrderStep.order + 1 : 0;
+    const maxOrder = steps.reduce((max, step) => 
+      Math.max(max, step.order), 
+      0
+    );
+    const nextOrder = maxOrder + 1;
 
     // Create step
     const step = await stepRepository.create({

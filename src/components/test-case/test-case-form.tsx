@@ -201,15 +201,16 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
     const trimmedTag = tag.trim();
     if (!trimmedTag || selectedTags.includes(trimmedTag)) return;
     
-    // Batch state updates to minimize renders
-    setSelectedTags(prev => {
-      const newTags = [...prev, trimmedTag];
-      // Update form value directly here to avoid the separate useEffect
-      const tagsString = newTags.join(',');
-      form.setValue('tags', tagsString, { shouldDirty: true });
-      return newTags;
-    });
+    // Create new tags array
+    const newTags = [...selectedTags, trimmedTag];
     
+    // Update tags state
+    setSelectedTags(newTags);
+    
+    // Update form value
+    form.setValue('tags', newTags.join(','), { shouldDirty: true });
+    
+    // Clear input
     setTagInput('');
     
     // Add to tag options if it doesn't exist
@@ -221,14 +222,15 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
 
   // Handle removing a tag - use function reference stability
   const handleRemoveTag = useCallback((tag: string) => {
-    setSelectedTags(prev => {
-      const newTags = prev.filter(t => t !== tag);
-      // Update form value directly here to avoid the separate useEffect
-      const tagsString = newTags.join(',');
-      form.setValue('tags', tagsString, { shouldDirty: true });
-      return newTags;
-    });
-  }, [form]);
+    // Create new tags array
+    const newTags = selectedTags.filter(t => t !== tag);
+    
+    // Update tags state
+    setSelectedTags(newTags);
+    
+    // Update form value
+    form.setValue('tags', newTags.join(','), { shouldDirty: true });
+  }, [selectedTags, form]);
 
   // Handle tag input key down
   const handleTagInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {

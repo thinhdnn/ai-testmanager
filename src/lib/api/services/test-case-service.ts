@@ -171,9 +171,24 @@ export class TestCaseService {
   }
 
   async moveTestCaseStep(projectId: string, testCaseId: string, stepId: string, order: number): Promise<Step> {
+    // Get all steps first to determine the new order
+    const steps = await this.getTestCaseSteps(projectId, testCaseId);
+    
+    // Sort steps by current order
+    const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
+    
+    // Create new array with the moved step at the desired position
+    const stepIds = sortedSteps
+      .filter(step => step.id !== stepId) // Remove the step being moved
+      .map(step => step.id); // Get IDs of remaining steps
+    
+    // Insert the moved step at the new position
+    stepIds.splice(order, 0, stepId);
+    
+    // Send the reordered array of step IDs
     const response = await this.apiClient.post<Step>(
       `/projects/${projectId}/test-cases/${testCaseId}/steps/reorder`,
-      { stepId, newOrder: order }
+      { stepIds }
     );
     return response;
   }

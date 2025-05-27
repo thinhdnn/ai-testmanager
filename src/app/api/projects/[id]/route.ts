@@ -4,6 +4,8 @@ import { checkResourcePermission } from '@/lib/rbac/check-permission';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { checkPermission } from '@/lib/rbac/check-permission';
 import { PrismaClient } from '@prisma/client';
+import path from 'path';
+import fs from 'fs/promises';
 
 const projectRepository = new ProjectRepository();
 const prisma = new PrismaClient();
@@ -11,7 +13,7 @@ const prisma = new PrismaClient();
 // Get a single project by ID
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: projectId } = await context.params;
@@ -49,7 +51,7 @@ export async function GET(
 // Update a project
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: projectId } = await context.params;
@@ -121,7 +123,7 @@ export async function PUT(
 // Delete a project
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: projectId } = await context.params;
@@ -138,6 +140,20 @@ export async function DELETE(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
+    // If project has a Playwright project path, delete the directory
+    if (existing.playwrightProjectPath) {
+      try {
+        const appRoot = process.cwd();
+        const absoluteProjectPath = path.join(appRoot, existing.playwrightProjectPath);
+        await fs.rm(absoluteProjectPath, { recursive: true, force: true });
+        console.log(`Deleted Playwright project directory: ${absoluteProjectPath}`);
+      } catch (error) {
+        console.error('Error deleting Playwright project directory:', error);
+        // Continue with database deletion even if file deletion fails
+      }
+    }
+
+    // Delete project from database
     await projectRepository.delete(projectId);
 
     return NextResponse.json({ success: true });

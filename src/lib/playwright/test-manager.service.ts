@@ -85,12 +85,22 @@ export class TestManagerService {
 
     await this.playwrightService.generateTestFile({
       testCaseName: testCase.name,
-      fixtures: fixtures.map(fixture => ({
-        name: fixture.name,
-        path: fixture.fixtureFilePath || '',
-        mode: fixture.type as 'extend' | 'inline',
-        exportName: fixture.exportName
-      })),
+      fixtures: fixtures.map(fixture => {
+        // Generate a default exportName if none exists
+        const exportName = fixture.exportName || fixture.name
+          .toLowerCase()
+          .replace(/[^\w\s]/g, '') // Remove special characters
+          .replace(/\s+(.)/g, (_, c) => c.toUpperCase()) // Convert to camelCase
+          .replace(/\s/g, '') // Remove spaces
+          .replace(/^(.)/, (_, c) => c.toLowerCase()); // Ensure first character is lowercase
+
+        return {
+          name: fixture.name,
+          path: fixture.fixtureFilePath || '',
+          mode: fixture.type as 'extend' | 'inline',
+          exportName
+        };
+      }),
       steps: testCase.Steps.map(step => ({
         order: step.order,
         action: step.action,

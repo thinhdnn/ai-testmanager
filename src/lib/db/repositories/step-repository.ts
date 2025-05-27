@@ -113,4 +113,23 @@ export class StepRepository {
       },
     });
   }
+
+  /**
+   * Reorder fixture steps after deleting one
+   */
+  async reorderFixtureStepsAfterDelete(fixtureId: string, deletedOrder: number) {
+    return prisma.step.updateMany({
+      where: {
+        fixtureId,
+        order: {
+          gt: deletedOrder,
+        },
+      },
+      data: {
+        order: {
+          decrement: 1,
+        },
+      },
+    });
+  }
 } 

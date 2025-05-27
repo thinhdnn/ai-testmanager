@@ -12,7 +12,7 @@ import { TestManagerService } from '@/lib/playwright/test-manager.service';
 // POST /api/projects/[id]/test-cases/[testCaseId]/steps/duplicate/[stepId]
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string; stepId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string; stepId: string }> }
 ) {
   try {
     // In Next.js 15, params is a Promise that must be awaited
@@ -56,14 +56,17 @@ export async function POST(
       0
     );
     
+    // Determine if this is a fixture step or a test case step
+    const isFixtureStep = !!stepToDuplicate.fixtureId;
+    
     // Create new step as a duplicate with next order
     // Use the data from the request if provided, otherwise use the original step data
     const newStep = await stepRepository.create({
-      testCaseId,
+      testCaseId: isFixtureStep ? undefined : testCaseId, // Only set testCaseId if not a fixture step
+      fixtureId: isFixtureStep && stepToDuplicate.fixtureId ? stepToDuplicate.fixtureId : undefined, // Only set fixtureId if it's a fixture step and has a valid ID
       action: requestBody.action || stepToDuplicate.action,
       data: requestBody.data || stepToDuplicate.data || undefined,
       expected: requestBody.expected || stepToDuplicate.expected || undefined,
-      fixtureId: requestBody.fixtureId || stepToDuplicate.fixtureId || undefined,
       playwrightScript: requestBody.playwrightScript || stepToDuplicate.playwrightScript || undefined,
       order: maxOrder + 1,
       disabled: stepToDuplicate.disabled,

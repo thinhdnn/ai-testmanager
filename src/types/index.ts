@@ -34,19 +34,24 @@ export interface TestResult {
 }
 
 export interface FixturePageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     page?: string;
     search?: string;
     type?: string;
-  };
+  }>;
 }
 
 export interface EditTestCasePageProps {
-  params: {
+  params: Promise<{
     id: string;
     testCaseId: string;
-  };
+  }>;
+}
+
+export interface PageProps {
+  params: Promise<any>;
+  searchParams: Promise<any>;
 } 

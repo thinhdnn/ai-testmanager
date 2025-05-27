@@ -15,7 +15,8 @@ async function fetchProject(projectId: string): Promise<Project | null> {
 }
 
 export async function generateMetadata({ params }: FixturePageProps): Promise<Metadata> {
-  const project = await fetchProject(params.id);
+  const resolvedParams = await params;
+  const project = await fetchProject(resolvedParams.id);
   
   if (!project) {
     return {
@@ -30,7 +31,8 @@ export async function generateMetadata({ params }: FixturePageProps): Promise<Me
 }
 
 export default async function FixturesPage({ params }: FixturePageProps) {
-  const { id } = params;
+  const resolvedParams = await params;
+  const { id } = resolvedParams;
   
   // Redirect to project page with fixtures tab activated via query parameter
   redirect(`/projects/${id}?tab=fixtures`);

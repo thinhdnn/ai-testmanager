@@ -56,27 +56,26 @@ import { FixtureService } from '@/lib/api/services/fixture-service';
 import { Step as ApiStep } from '@/lib/api/interfaces';
 import { AddStepForm, StepFormData } from '@/components/step/add-step-form';
 
-interface Step {
-  id: string;
-  action: string;
-  data?: string | undefined | null;
-  expected?: string | undefined | null;
-  order: number;
+interface Step extends ApiStep {
   disabled: boolean;
-  fixtureId?: string | undefined | null;
-  fixture?: {
-    id: string;
-    name: string;
-    type: string;
-  } | undefined | null;
-  playwrightScript?: string | undefined | null;
 }
+
+// Helper function to convert API step to component step
+const convertApiStep = (apiStep: ApiStep): Step => ({
+  ...apiStep,
+  type: apiStep.type || 'manual',
+  disabled: apiStep.disabled ?? false,
+  parentId: apiStep.parentId || apiStep.id,
+  createdAt: apiStep.createdAt,
+  updatedAt: apiStep.updatedAt
+});
 
 interface TestStepsTableProps {
   steps: Step[];
-  testCaseId: string;
   projectId: string;
-  onVersionUpdate?: (newVersion: string) => void;
+  testCaseId?: string;
+  fixtureId?: string;
+  onVersionUpdate?: (version: string) => void;
   onStepsChange?: () => void;
 }
 
@@ -86,14 +85,25 @@ interface Fixture {
   type: string;
 }
 
-export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onVersionUpdate, onStepsChange }: TestStepsTableProps) {
+export function TestStepsTable({ 
+  steps: initialSteps, 
+  testCaseId, 
+  fixtureId,
+  projectId, 
+  onVersionUpdate, 
+  onStepsChange 
+}: TestStepsTableProps) {
   const router = useRouter();
+  const [steps, setSteps] = useState<Step[]>(initialSteps.map(convertApiStep));
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
+  const [isEditStepDialogOpen, setIsEditStepDialogOpen] = useState(false);
+  const [selectedStep, setSelectedStep] = useState<Step | null>(null);
+  const [isFixture] = useState(!!fixtureId);
   const [activeStep, setActiveStep] = useState<Step | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [steps, setSteps] = useState<Step[]>(initialSteps);
   const [isMoveToDialogOpen, setIsMoveToDialogOpen] = useState(false);
   const [targetPosition, setTargetPosition] = useState<number>(1);
   const [stepToMove, setStepToMove] = useState<Step | null>(null);
@@ -104,12 +114,9 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
   const testCaseService = useMemo(() => new TestCaseService(), []);
   const fixtureService = useMemo(() => new FixtureService(), []);
   
-  // Determine if we're handling fixture steps or test case steps
-  const isFixture = !!initialSteps.find(step => step.fixtureId);
-  
   // Update local steps when props change
   useEffect(() => {
-    setSteps(initialSteps);
+    setSteps(initialSteps.map(convertApiStep));
   }, [initialSteps]);
   
   // Use project.update instead of testcase.update for permission check
@@ -153,7 +160,7 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
       if (isFixture && activeStep.fixtureId) {
         await fixtureService.deleteFixtureStep(projectId, activeStep.fixtureId, activeStep.id);
       } else {
-        await testCaseService.deleteTestCaseStep(projectId, testCaseId, activeStep.id);
+        await testCaseService.deleteTestCaseStep(projectId, testCaseId!, activeStep.id);
       }
       
       // Remove the step from the local state
@@ -188,20 +195,18 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
       setIsLoading(true);
       
       // Find the step to move
-      const stepToMove = steps.find(step => step.id === stepId);
-      if (!stepToMove) {
+      const currentIndex = steps.findIndex(step => step.id === stepId);
+      if (currentIndex === -1) {
         toast.error('Step not found');
         return;
       }
       
       // Calculate the new position
-      const currentIndex = steps.findIndex(step => step.id === stepId);
       let newPosition;
-      
       if (direction === 'up' && currentIndex > 0) {
-        newPosition = steps[currentIndex - 1].order;
+        newPosition = currentIndex - 1;
       } else if (direction === 'down' && currentIndex < steps.length - 1) {
-        newPosition = steps[currentIndex + 1].order;
+        newPosition = currentIndex + 1;
       } else {
         // Can't move further in this direction
         setIsLoading(false);
@@ -209,10 +214,10 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
       }
       
       // Use the appropriate service based on whether it's a fixture or test case
-      if (isFixture && stepToMove.fixtureId) {
-        await fixtureService.moveFixtureStep(projectId, stepToMove.fixtureId, stepId, newPosition);
+      if (isFixture && steps[currentIndex].fixtureId) {
+        await fixtureService.moveFixtureStep(projectId, steps[currentIndex].fixtureId!, stepId, newPosition);
       } else {
-        await testCaseService.moveTestCaseStep(projectId, testCaseId, stepId, newPosition);
+        await testCaseService.moveTestCaseStep(projectId, testCaseId!, stepId, newPosition);
       }
       
       // If there's an onVersionUpdate callback, update the parent component
@@ -225,8 +230,6 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
         onStepsChange();
       } else {
         // Update the local steps array with the new order
-        // Note: In a real implementation, the API would return the updated steps array
-        // For simplicity, we'll just refetch the steps
         router.refresh();
       }
       
@@ -266,7 +269,7 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
       } else {
         updatedStep = await testCaseService.updateTestCaseStep(
           projectId, 
-          testCaseId, 
+          testCaseId!, 
           step.id, 
           {
             action: step.action,
@@ -318,17 +321,29 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
   const handleDuplicateStep = async (step: Step) => {
     try {
       setIsLoading(true);
-      
-      let result;
-      // Use the appropriate service based on whether it's a fixture or test case
-      if (isFixture && step.fixtureId) {
-        result = await fixtureService.duplicateFixtureStep(projectId, step.fixtureId, step.id);
-      } else {
-        result = await testCaseService.duplicateTestCaseStep(projectId, testCaseId, step.id);
+
+      // Validate that we have either a testCaseId or fixtureId
+      if (!testCaseId && !fixtureId) {
+        throw new Error('Either testCaseId or fixtureId must be provided');
       }
       
+      let apiResult: ApiStep | undefined;
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture && step.fixtureId) {
+        apiResult = await fixtureService.duplicateFixtureStep(projectId, step.fixtureId, step.id);
+      } else if (testCaseId) {
+        apiResult = await testCaseService.duplicateTestCaseStep(projectId, testCaseId, step.id);
+      }
+
+      if (!apiResult) {
+        throw new Error('Failed to duplicate step');
+      }
+
+      // Convert API step to component step
+      const duplicatedStep = convertApiStep(apiResult);
+
       // Update local state with the new duplicated step
-      setSteps(prevSteps => [...prevSteps, result as Step]);
+      setSteps(prevSteps => [...prevSteps, duplicatedStep]);
       
       // If there's an onVersionUpdate callback, update the parent component
       if (onVersionUpdate) {
@@ -378,7 +393,7 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
       } else {
         await testCaseService.moveTestCaseStep(
           projectId, 
-          testCaseId, 
+          testCaseId!, 
           stepToMove.id, 
           apiPosition
         );
@@ -406,6 +421,146 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
     }
   };
   
+  // Handle adding a new step
+  const handleAddStep = async (data: StepFormData) => {
+    try {
+      setIsLoading(true);
+      let result: ApiStep | undefined;
+
+      // Validate that we have either a testCaseId or fixtureId
+      if (!testCaseId && !fixtureId) {
+        throw new Error('Either testCaseId or fixtureId must be provided');
+      }
+
+      // Use the appropriate service based on whether it's a fixture or test case
+      if (isFixture && fixtureId) {
+        result = await fixtureService.createFixtureStep(projectId, fixtureId, {
+          action: data.action,
+          data: data.data || undefined,
+          expected: data.expected || undefined,
+          playwrightScript: data.playwrightScript || undefined,
+        });
+      } else if (testCaseId) {
+        const stepData = {
+          action: data.action,
+          data: data.data || undefined,
+          expected: data.expected || undefined,
+          playwrightScript: data.playwrightScript || undefined,
+          fixtureId: data.fixtureId,
+        };
+
+        result = await testCaseService.createTestCaseStep(projectId, testCaseId, stepData);
+      }
+
+      if (!result) {
+        throw new Error('Failed to create step');
+      }
+
+      // Convert API step to component step
+      const newStep = convertApiStep(result);
+
+      // Update local state with the new step
+      setSteps(prevSteps => [...prevSteps, newStep]);
+      
+      // If there's version info and onVersionUpdate callback, update the parent component
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
+      }
+
+      // Notify the parent component to refresh steps
+      if (onStepsChange) {
+        onStepsChange();
+      }
+      
+      toast.success('Step added successfully');
+      setIsAddDialogOpen(false);
+      
+      // Also refresh the router to ensure server-side data is updated
+      router.refresh();
+    } catch (error) {
+      console.error('Error adding step:', error);
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle updating a step
+  const handleUpdateStep = async (data: StepFormData) => {
+    try {
+      setIsLoading(true);
+
+      // Validate that we have either a testCaseId or fixtureId
+      if (!testCaseId && !fixtureId) {
+        throw new Error('Either testCaseId or fixtureId must be provided');
+      }
+
+      if (activeStep) {
+        let apiResult: ApiStep | undefined;
+
+        if (isFixture && fixtureId) {
+          apiResult = await fixtureService.updateFixtureStep(
+            projectId,
+            fixtureId,
+            activeStep.id,
+            {
+              action: data.action,
+              data: data.data || undefined,
+              expected: data.expected || undefined,
+              playwrightScript: data.playwrightScript || undefined,
+            }
+          );
+        } else if (testCaseId) {
+          apiResult = await testCaseService.updateTestCaseStep(
+            projectId,
+            testCaseId,
+            activeStep.id,
+            {
+              action: data.action,
+              data: data.data || undefined,
+              expected: data.expected || undefined,
+              playwrightScript: data.playwrightScript || undefined,
+              fixtureId: data.fixtureId,
+            }
+          );
+        }
+
+        if (!apiResult) {
+          throw new Error('Failed to update step');
+        }
+
+        // Convert API step to component step
+        const updatedStep = convertApiStep(apiResult);
+
+        // Update local state with the updated step
+        setSteps(prevSteps => 
+          prevSteps.map(step => step.id === activeStep.id ? updatedStep : step)
+        );
+        
+        // If there's an onVersionUpdate callback, update the parent component
+        if (onVersionUpdate) {
+          onVersionUpdate('latest');
+        }
+        
+        // Notify the parent component to refresh steps
+        if (onStepsChange) {
+          onStepsChange();
+        }
+        
+        toast.success('Step updated successfully');
+        setIsEditDialogOpen(false);
+        setActiveStep(null);
+        
+        // Also refresh the router
+        router.refresh();
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -468,10 +623,10 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
                       className={`${step.disabled === true ? 'bg-muted/30' : ''} h-[40px]`}
                     >
                       <TableCell className="font-medium py-1">
-                      <div className="flex items-center gap-1">
-                          {typeof step.order === 'number' ? step.order + 1 : '-'}
-                      </div>
-                    </TableCell>
+                        <div className="flex items-center gap-1">
+                          {typeof step.order === 'number' ? step.order : '-'}
+                        </div>
+                      </TableCell>
                       <TableCell className={`${step.disabled === true ? 'text-muted-foreground' : ''} py-1`}>
                         {step.action || '-'}
                     </TableCell>
@@ -592,55 +747,7 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
           </DialogHeader>
           
           <AddStepForm 
-            onSubmit={async (data) => {
-              try {
-                setIsLoading(true);
-                
-                let result;
-                // Use the appropriate service based on whether it's a fixture or test case
-                if (isFixture) {
-                  result = await fixtureService.createFixtureStep(projectId, testCaseId, {
-                    action: data.action,
-                    data: data.data || undefined,
-                    expected: data.expected || undefined,
-                    fixtureId: data.fixtureId || undefined,
-                    playwrightScript: data.playwrightScript || undefined, // Use user-provided script
-                  });
-                } else {
-                  const response = await testCaseService.createTestCaseStep(projectId, testCaseId, {
-                    action: data.action,
-                    data: data.data || undefined,
-                    expected: data.expected || undefined,
-                    fixtureId: data.fixtureId || undefined,
-                    playwrightScript: data.playwrightScript || undefined,
-                  });
-                  result = response;
-                }
-                
-                // Update local state with the new step
-                setSteps(prevSteps => [...prevSteps, result as Step]);
-                
-                // If there's version info and onVersionUpdate callback, update the parent component
-                if (onVersionUpdate) {
-                  onVersionUpdate('latest');
-                }
-
-                // Notify the parent component to refresh steps
-                if (onStepsChange) {
-                  onStepsChange();
-                }
-                
-                toast.success('Step added successfully');
-                setIsAddDialogOpen(false);
-                
-                // Also refresh the router to ensure server-side data is updated
-                router.refresh();
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
-              } finally {
-                setIsLoading(false);
-              }
-            }}
+            onSubmit={handleAddStep}
             onCancel={() => setIsAddDialogOpen(false)}
             isSubmitting={isLoading}
             initialData={{ action: '', data: '', expected: '', playwrightScript: '' }}
@@ -664,71 +771,7 @@ export function TestStepsTable({ steps: initialSteps, testCaseId, projectId, onV
           
           {activeStep && (
             <AddStepForm 
-              onSubmit={async (data) => {
-                try {
-                  setIsLoading(true);
-                  
-                  let result;
-                  // Use the appropriate service based on whether it's a fixture or test case
-                  if (isFixture) {
-                    result = await fixtureService.updateFixtureStep(
-                      projectId, 
-                      testCaseId, 
-                      activeStep.id, 
-                      {
-                        action: data.action,
-                        data: data.data || undefined,
-                        expected: data.expected || undefined,
-                        fixtureId: data.fixtureId || undefined,
-                        playwrightScript: data.playwrightScript || undefined, // Use user-provided script
-                        disabled: activeStep.disabled,
-                        order: activeStep.order,
-                      }
-                    );
-                  } else {
-                    result = await testCaseService.updateTestCaseStep(
-                      projectId, 
-                      testCaseId, 
-                      activeStep.id, 
-                      {
-                        action: data.action,
-                        data: data.data || undefined,
-                        expected: data.expected || undefined,
-                        fixtureId: data.fixtureId || undefined,
-                        playwrightScript: data.playwrightScript || undefined,
-                        disabled: activeStep.disabled,
-                        order: activeStep.order,
-                      }
-                    );
-                  }
-                  
-                  // Update local state with the updated step
-                  setSteps(prevSteps => 
-                    prevSteps.map(step => step.id === activeStep.id ? result as Step : step)
-                  );
-                  
-                  // If there's an onVersionUpdate callback, update the parent component
-                  if (onVersionUpdate) {
-                    onVersionUpdate('latest');
-                  }
-                  
-                  // Notify the parent component to refresh steps
-                  if (onStepsChange) {
-                    onStepsChange();
-                  }
-                  
-                  toast.success('Step updated successfully');
-                  setIsEditDialogOpen(false);
-                  setActiveStep(null);
-                  
-                  // Also refresh the router
-                  router.refresh();
-                } catch (error) {
-                  toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
-                } finally {
-                  setIsLoading(false);
-                }
-              }}
+              onSubmit={handleUpdateStep}
               onCancel={() => setIsEditDialogOpen(false)}
               isSubmitting={isLoading}
               initialData={{ 

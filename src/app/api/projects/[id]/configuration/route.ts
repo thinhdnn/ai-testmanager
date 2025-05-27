@@ -12,7 +12,7 @@ interface ConfigurationSettings {
 // Get project configuration settings
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -20,7 +20,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id: projectId } = await context.params;
+    const params = await context.params;
+    const projectId = params.id;
     const settings = await prisma.projectSetting.findMany({
       where: { projectId },
     });
@@ -47,7 +48,7 @@ export async function GET(
 // Update project configuration settings
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -55,7 +56,8 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id: projectId } = await context.params;
+    const params = await context.params;
+    const projectId = params.id;
     const data = await request.json() as ConfigurationSettings;
 
     // Validate project exists

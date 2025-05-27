@@ -5,7 +5,7 @@ import { TagRepository } from '@/lib/db/repositories/tag-repository';
 // GET /api/projects/[id]/tags
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const paramsCopy = await Promise.resolve(params);
@@ -78,7 +78,7 @@ export async function GET(
 // POST /api/projects/[id]/tags
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const paramsCopy = await Promise.resolve(params);

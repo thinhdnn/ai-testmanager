@@ -14,33 +14,24 @@ const prisma = new PrismaClient();
 // POST /api/projects/[id]/test-cases/[testCaseId]/steps/reorder
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string }> }
 ) {
   try {
-    // In Next.js 15, params is a Promise that must be awaited
-    const params_data = await params;
-    const projectId = params_data.id;
-    const testCaseId = params_data.testCaseId;
-    
+    const { id: projectId, testCaseId } = await params;
     const userEmail = await getCurrentUserEmail();
     
-    // Check if user has permission to update test steps
-    const hasPermission = await checkResourcePermission(
-      'project',
-      'update',
-      projectId
-    );
-
+    // Check permission
+    const hasPermission = await checkResourcePermission('project', 'update', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { stepId, newOrder } = body;
-
-    if (stepId === undefined || newOrder === undefined) {
+    // Get the request body containing the ordered step IDs
+    const { stepIds } = await request.json();
+    
+    if (!stepIds || !Array.isArray(stepIds) || stepIds.length === 0) {
       return NextResponse.json(
-        { error: 'StepId and newOrder are required' },
+        { error: 'Invalid request body. Expected an array of step IDs.' },
         { status: 400 }
       );
     }
@@ -50,89 +41,43 @@ export async function POST(
     const testCaseRepository = new TestCaseRepository();
     const testCaseVersionRepository = new TestCaseVersionRepository();
     const stepVersionRepository = new StepVersionRepository();
-    
-    // Get the step to reorder
-    const stepToMove = await stepRepository.findById(stepId);
-    if (!stepToMove) {
-      return NextResponse.json({ error: 'Step not found' }, { status: 404 });
-    }
-    
-    // Get all steps for the test case
-    const allSteps = await stepRepository.findByTestCaseId(testCaseId);
-    if (!allSteps || allSteps.length === 0) {
-      return NextResponse.json({ error: 'No steps found for this test case' }, { status: 404 });
-    }
-    
-    // Validate the new order is within range
-    if (newOrder < 0 || newOrder >= allSteps.length) {
-      return NextResponse.json(
-        { error: `New order must be between 0 and ${allSteps.length - 1}` },
-        { status: 400 }
-      );
-    }
-    
-    // Execute the reordering
-    // Get the current order of the step
-    const currentOrder = stepToMove.order;
-    let updatedSteps = [];
-    
-    // Update order for affected steps in a transaction
-    updatedSteps = await prisma.$transaction(async (tx) => {
-      if (newOrder > currentOrder) {
-        // Moving down: decrement order for steps between current and new position
-        await tx.step.updateMany({
-          where: {
-            testCaseId,
-            order: {
-              gt: currentOrder,
-              lte: newOrder,
-            },
-          },
-          data: {
-            order: {
-              decrement: 1,
-            },
-          },
-        });
-      } else if (newOrder < currentOrder) {
-        // Moving up: increment order for steps between new and current position
-        await tx.step.updateMany({
-          where: {
-            testCaseId,
-            order: {
-              gte: newOrder,
-              lt: currentOrder,
-            },
-          },
-          data: {
-            order: {
-              increment: 1,
-            },
-          },
-        });
-      }
-      
-      // Update the target step to the new order
-      await tx.step.update({
-        where: { id: stepId },
-        data: { order: newOrder },
-      });
-      
-      // Return all steps in their new order
-      return tx.step.findMany({
-        where: { testCaseId },
-        orderBy: { order: 'asc' },
-      });
-    });
-    
-    // Update the test case version
+
+    // Get the test case
     const testCase = await testCaseRepository.findById(testCaseId);
-    
     if (!testCase) {
       return NextResponse.json({ error: 'Test case not found' }, { status: 404 });
     }
-    
-    // Increment the version using the utility function
+
+    // Verify that this test case belongs to the specified project
+    if (testCase.projectId !== projectId) {
+      return NextResponse.json({ error: 'Test case not found in this project' }, { status: 404 });
+    }
+
+    // Get all steps to validate the provided step IDs
+    const existingSteps = await stepRepository.findByTestCaseId(testCaseId);
+    const existingStepIds = existingSteps.map(step => step.id);
+
+    // Check that all provided step IDs belong to this test case
+    const invalidStepIds = stepIds.filter(id => !existingStepIds.includes(id));
+    if (invalidStepIds.length > 0) {
+      return NextResponse.json(
+        { error: `Some step IDs do not belong to this test case: ${invalidStepIds.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // Update the order of each step
+    const updatedSteps = [];
+    for (let i = 0; i < stepIds.length; i++) {
+      const stepId = stepIds[i];
+      const step = await stepRepository.update(stepId, {
+        order: i,
+        updatedBy: userEmail
+      });
+      updatedSteps.push(step);
+    }
+
+    // Create a new version for the test case
     const newVersion = incrementVersion(testCase.version);
     
     // Update test case with new version
@@ -140,7 +85,7 @@ export async function POST(
       version: newVersion,
       updatedBy: userEmail
     });
-    
+
     // Create a new test case version
     const latestVersion = await testCaseVersionRepository.create({
       testCaseId,
@@ -148,8 +93,8 @@ export async function POST(
       name: testCase.name,
       createdBy: userEmail
     });
-    
-    // Create versions for all steps in their new order
+
+    // Create step versions for all steps in their new order
     if (latestVersion) {
       for (const step of updatedSteps) {
         await stepVersionRepository.create({
@@ -164,7 +109,7 @@ export async function POST(
         });
       }
     }
-    
+
     // Generate test file if the test case is not manual
     if (!testCase.isManual) {
       try {
@@ -177,16 +122,16 @@ export async function POST(
         // We don't fail the request if file update fails
       }
     }
-    
+
     return NextResponse.json({
       steps: updatedSteps,
       version: newVersion,
       message: 'Steps reordered successfully'
     });
   } catch (error) {
-    console.error('Error reordering steps:', error);
+    console.error('Error reordering test case steps:', error);
     return NextResponse.json(
-      { error: 'Failed to reorder steps' },
+      { error: 'Failed to reorder test case steps' },
       { status: 500 }
     );
   }

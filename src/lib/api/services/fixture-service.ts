@@ -98,9 +98,24 @@ export class FixtureService {
   }
 
   async moveFixtureStep(projectId: string, fixtureId: string, stepId: string, order: number): Promise<Step> {
-    const response = await this.apiClient.put<Step>(
-      `/projects/${projectId}/fixtures/${fixtureId}/steps/${stepId}/move`,
-      { order }
+    // Get all steps first to determine the new order
+    const steps = await this.getFixtureSteps(projectId, fixtureId);
+    
+    // Sort steps by current order
+    const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
+    
+    // Create new array with the moved step at the desired position
+    const stepIds = sortedSteps
+      .filter(step => step.id !== stepId) // Remove the step being moved
+      .map(step => step.id); // Get IDs of remaining steps
+    
+    // Insert the moved step at the new position
+    stepIds.splice(order, 0, stepId);
+    
+    // Send the reordered array of step IDs
+    const response = await this.apiClient.post<Step>(
+      `/projects/${projectId}/fixtures/${fixtureId}/steps/reorder`,
+      { stepIds }
     );
     return response;
   }

@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 // GET endpoint for a specific fixture step
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string; stepId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string; stepId: string }> }
 ) {
   try {
     const paramsObj = await params;
@@ -68,7 +68,7 @@ export async function GET(
 // PUT endpoint to update a fixture step
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string; stepId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string; stepId: string }> }
 ) {
   try {
     const paramsObj = await params;
@@ -209,7 +209,7 @@ export async function PUT(
 // DELETE endpoint to remove a fixture step
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string; stepId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string; stepId: string }> }
 ) {
   try {
     const paramsObj = await params;
@@ -252,6 +252,9 @@ export async function DELETE(
     
     // Delete the step
     await stepRepository.delete(stepId);
+    
+    // Reorder remaining steps
+    await stepRepository.reorderFixtureStepsAfterDelete(fixtureId, step.order);
     
     // Create a new version for the fixture
     const fixtureVersionRepository = new FixtureVersionRepository();

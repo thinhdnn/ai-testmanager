@@ -601,11 +601,11 @@ export default function FixtureDetailPage() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
-              ) : steps.length > 0 ? ( // Check the main 'steps' state array
+              ) : steps.length > 0 ? (
                 <TestStepsTable 
-                  steps={steps} // Pass the main 'steps' state array
-                  projectId={projectId} 
-                  testCaseId={fixtureId} // Use fixtureId here as it's the parent context
+                  steps={steps}
+                  projectId={projectId}
+                  fixtureId={fixtureId}
                   onStepsChange={refreshFixtureData}
                 />
               ) : (
@@ -714,7 +714,7 @@ export default function FixtureDetailPage() {
                     <tbody>
                       {versionSteps.sort((a, b) => a.order - b.order).map((step) => (
                         <tr key={step.id} className="border-t">
-                          <td className="p-2">{step.order + 1}</td>
+                          <td className="p-2">{step.order}</td>
                           <td className="p-2">{step.action}</td>
                           <td className="p-2">{step.data || '-'}</td>
                           <td className="p-2">{step.expected || '-'}</td>

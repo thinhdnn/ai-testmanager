@@ -8,7 +8,7 @@ import { incrementVersion } from '@/lib/utils/version';
 // POST /api/projects/[id]/fixtures/[fixtureId]/revert/[versionId]
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string; versionId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string; versionId: string }> }
 ) {
   try {
     const { id: projectId, fixtureId, versionId } = await params;

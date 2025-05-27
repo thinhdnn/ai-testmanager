@@ -1,63 +1,60 @@
 import { prisma } from '../prisma';
-import { TestStep, Prisma, PrismaClient } from '@prisma/client';
+import { Step, Prisma, PrismaClient } from '@prisma/client';
 
 /**
- * Repository for TestStep entity CRUD operations
+ * Repository for Step entity CRUD operations
  */
-export class TestStepRepository {
+export class StepRepository {
   /**
-   * Create a new test step
+   * Create a new step
    */
-  async create(data: Prisma.TestStepCreateInput): Promise<TestStep> {
-    return prisma.testStep.create({
+  async create(data: Prisma.StepCreateInput): Promise<Step> {
+    return prisma.step.create({
       data,
     });
   }
 
   /**
-   * Create multiple test steps
+   * Create multiple steps
    */
-  async createMany(data: Prisma.TestStepCreateManyInput[]): Promise<Prisma.BatchPayload> {
-    return prisma.testStep.createMany({
+  async createMany(data: Prisma.StepCreateManyInput[]): Promise<Prisma.BatchPayload> {
+    return prisma.step.createMany({
       data,
     });
   }
 
   /**
-   * Get a test step by ID
+   * Get a step by ID
    */
-  async findById(id: string): Promise<TestStep | null> {
-    return prisma.testStep.findUnique({
+  async findById(id: string): Promise<Step | null> {
+    return prisma.step.findUnique({
       where: { id },
     });
   }
 
   /**
-   * Get a test step by ID with relations
+   * Get a step by ID with relations
    */
   async findByIdWithRelations(
     id: string, 
     relations: { testCase?: boolean; stepResults?: boolean } = {}
-  ): Promise<TestStep | null> {
-    return prisma.testStep.findUnique({
+  ): Promise<Step | null> {
+    return prisma.step.findUnique({
       where: { id },
-      include: {
-        testCase: relations.testCase || false,
-        stepResults: relations.stepResults || false,
-      },
+      include: relations,
     });
   }
 
   /**
-   * Get all test steps with pagination and filtering
+   * Find steps with pagination and filtering
    */
-  async findAll(options?: {
+  async findMany(options?: {
     skip?: number;
     take?: number;
-    orderBy?: Prisma.TestStepOrderByWithRelationInput;
-    where?: Prisma.TestStepWhereInput;
-  }): Promise<TestStep[]> {
-    return prisma.testStep.findMany({
+    orderBy?: Prisma.StepOrderByWithRelationInput;
+    where?: Prisma.StepWhereInput;
+  }): Promise<Step[]> {
+    return prisma.step.findMany({
       skip: options?.skip,
       take: options?.take,
       orderBy: options?.orderBy,
@@ -66,67 +63,86 @@ export class TestStepRepository {
   }
 
   /**
-   * Update a test step
+   * Update a step
    */
-  async update(id: string, data: Prisma.TestStepUpdateInput): Promise<TestStep> {
-    return prisma.testStep.update({
+  async update(id: string, data: Prisma.StepUpdateInput): Promise<Step> {
+    return prisma.step.update({
       where: { id },
       data,
     });
   }
 
   /**
-   * Delete a test step
+   * Delete a step
    */
-  async delete(id: string): Promise<TestStep> {
-    return prisma.testStep.delete({
+  async delete(id: string): Promise<Step> {
+    return prisma.step.delete({
       where: { id },
     });
   }
 
   /**
-   * Count test steps based on criteria
+   * Find steps by test case ID
    */
-  async count(where?: Prisma.TestStepWhereInput): Promise<number> {
-    return prisma.testStep.count({
-      where,
-    });
-  }
-
-  /**
-   * Find test steps by test case ID
-   */
-  async findByTestCaseId(testCaseId: string): Promise<TestStep[]> {
-    return prisma.testStep.findMany({
+  async findByTestCaseId(testCaseId: string): Promise<Step[]> {
+    return prisma.step.findMany({
       where: { testCaseId },
       orderBy: { order: 'asc' },
     });
   }
 
   /**
-   * Delete all test steps for a test case
+   * Find steps by fixture ID
+   */
+  async findByFixtureId(fixtureId: string, options?: {
+    skip?: number;
+    take?: number;
+    projectId?: string;
+  }): Promise<Step[]> {
+    return prisma.step.findMany({
+      where: {
+        fixtureId,
+        ...(options?.projectId ? { fixture: { projectId: options.projectId } } : {}),
+      },
+      skip: options?.skip,
+      take: options?.take,
+      orderBy: { order: 'asc' },
+    });
+  }
+
+  /**
+   * Count steps based on criteria
+   */
+  async count(where?: Prisma.StepWhereInput): Promise<number> {
+    return prisma.step.count({
+      where,
+    });
+  }
+
+  /**
+   * Delete all steps for a test case
    */
   async deleteAllForTestCase(testCaseId: string): Promise<Prisma.BatchPayload> {
-    return prisma.testStep.deleteMany({
+    return prisma.step.deleteMany({
       where: { testCaseId },
     });
   }
 
   /**
-   * Reorder test steps after a step is moved
+   * Reorder steps after a step is moved
    */
   async reorderSteps(testCaseId: string, fromOrder: number, toOrder: number): Promise<void> {
     // Start a transaction to ensure all updates happen atomically
-    await prisma.$transaction(async (tx: PrismaClient) => {
+    await prisma.$transaction(async (tx) => {
       // Get all steps for the test case, sorted by order
-      const steps = await tx.testStep.findMany({
+      const steps = await tx.step.findMany({
         where: { testCaseId },
         orderBy: { order: 'asc' },
       });
 
       if (fromOrder < toOrder) {
         // Moving a step down in order
-        await tx.testStep.updateMany({
+        await tx.step.updateMany({
           where: {
             testCaseId,
             order: {
@@ -135,12 +151,14 @@ export class TestStepRepository {
             },
           },
           data: {
-            order: { decrement: 1 },
+            order: {
+              decrement: 1,
+            },
           },
         });
       } else {
         // Moving a step up in order
-        await tx.testStep.updateMany({
+        await tx.step.updateMany({
           where: {
             testCaseId,
             order: {
@@ -149,13 +167,15 @@ export class TestStepRepository {
             },
           },
           data: {
-            order: { increment: 1 },
+            order: {
+              increment: 1,
+            },
           },
         });
       }
 
       // Update the moved step to its new position
-      await tx.testStep.updateMany({
+      await tx.step.updateMany({
         where: {
           testCaseId,
           order: fromOrder,
@@ -168,10 +188,10 @@ export class TestStepRepository {
   }
 
   /**
-   * Update the order of the test steps when a step is deleted
+   * Update the order of the steps when a step is deleted
    */
   async updateOrderAfterDelete(testCaseId: string, deletedOrder: number): Promise<void> {
-    await prisma.testStep.updateMany({
+    await prisma.step.updateMany({
       where: {
         testCaseId,
         order: {
@@ -179,28 +199,9 @@ export class TestStepRepository {
         },
       },
       data: {
-        order: { decrement: 1 },
-      },
-    });
-  }
-
-  /**
-   * Find steps with validation errors
-   */
-  async findWithValidationErrors(options?: {
-    skip?: number;
-    take?: number;
-    projectId?: string;
-  }): Promise<TestStep[]> {
-    return prisma.testStep.findMany({
-      where: {
-        validationErrors: { not: null },
-        testCase: options?.projectId ? { projectId: options.projectId } : undefined,
-      },
-      skip: options?.skip,
-      take: options?.take,
-      include: {
-        testCase: true,
+        order: {
+          decrement: 1,
+        },
       },
     });
   }

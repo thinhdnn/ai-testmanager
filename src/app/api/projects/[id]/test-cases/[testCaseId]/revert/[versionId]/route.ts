@@ -10,16 +10,17 @@ import { incrementMinorVersion } from '@/lib/utils/version';
 // POST /api/projects/[id]/test-cases/[testCaseId]/revert/[versionId]
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string; versionId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string; versionId: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const userEmail = await getCurrentUserEmail();
     
     // Verify that the test case exists and belongs to the project
     const testCase = await prisma.testCase.findFirst({
       where: {
-        id: params.testCaseId,
-        projectId: params.id,
+        id: resolvedParams.testCaseId,
+        projectId: resolvedParams.id,
       },
     });
     
@@ -33,8 +34,8 @@ export async function POST(
     // Verify that the version exists and belongs to the test case
     const version = await prisma.testCaseVersion.findFirst({
       where: {
-        id: params.versionId,
-        testCaseId: params.testCaseId,
+        id: resolvedParams.versionId,
+        testCaseId: resolvedParams.testCaseId,
       },
       include: {
         stepVersions: {
@@ -78,7 +79,7 @@ export async function POST(
       // Create a new version record before making changes
       const newTestCaseVersion = await tx.testCaseVersion.create({
         data: {
-          testCaseId: params.testCaseId,
+          testCaseId: resolvedParams.testCaseId,
           version: newVersion,
           name: testCase.name,
           createdBy: userEmail,
@@ -89,7 +90,7 @@ export async function POST(
       // (This preserves the current state before we replace it with the reverted state)
       const currentSteps = await tx.step.findMany({
         where: {
-          testCaseId: params.testCaseId,
+          testCaseId: resolvedParams.testCaseId,
         },
         orderBy: {
           order: 'asc',
@@ -112,7 +113,7 @@ export async function POST(
       // Delete existing steps for the test case
       await tx.step.deleteMany({
         where: {
-          testCaseId: params.testCaseId,
+          testCaseId: resolvedParams.testCaseId,
         },
       });
       
@@ -121,7 +122,7 @@ export async function POST(
       for (const stepVersion of version.stepVersions) {
         const newStep = await tx.step.create({
           data: {
-            testCaseId: params.testCaseId,
+            testCaseId: resolvedParams.testCaseId,
             action: stepVersion.action,
             data: stepVersion.data,
             expected: stepVersion.expected,
@@ -137,7 +138,7 @@ export async function POST(
       // Update the test case with the new version number
       const updatedTestCase = await tx.testCase.update({
         where: {
-          id: params.testCaseId,
+          id: resolvedParams.testCaseId,
         },
         data: {
           version: newVersion,

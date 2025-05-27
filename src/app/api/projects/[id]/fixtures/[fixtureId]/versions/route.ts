@@ -6,7 +6,7 @@ import { checkResourcePermission } from '@/lib/rbac/check-permission';
 // GET /api/projects/[id]/fixtures/[fixtureId]/versions
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string }> }
 ) {
   try {
     const resolvedParams = await params;

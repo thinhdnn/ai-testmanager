@@ -9,6 +9,9 @@ type TestCaseVersionCreateInput = {
   description?: string;
   playwrightScript?: string;
   createdBy?: string | null | undefined;
+  stepVersions?: {
+    create: any[];
+  };
 };
 
 type TestCaseVersionUpdateInput = {

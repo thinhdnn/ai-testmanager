@@ -4,7 +4,7 @@ import { TestResultRepository } from '@/lib/db/repositories/test-result-reposito
 // GET /api/projects/[id]/test-cases/[testCaseId]/results
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string; testCaseId: string } }
+  context: { params: Promise<{ id: string; testCaseId: string }> }
 ) {
   try {
     // Wait for params to be available

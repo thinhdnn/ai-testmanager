@@ -34,7 +34,7 @@ async function generateUniqueTestCaseName(baseName: string, projectId: string): 
 // POST /api/projects/[id]/test-cases/[testCaseId]/clone
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string }> }
 ) {
   try {
     const resolvedParams = await params;

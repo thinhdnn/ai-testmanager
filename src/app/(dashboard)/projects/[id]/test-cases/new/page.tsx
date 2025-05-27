@@ -12,9 +12,9 @@ interface Project {
 }
 
 interface Props {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 async function fetchProject(projectId: string): Promise<Project | null> {

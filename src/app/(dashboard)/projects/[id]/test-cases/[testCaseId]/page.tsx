@@ -37,15 +37,56 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { RunTestDialog } from '@/components/test-case/run-test-dialog';
-import { 
-  Project, 
-  TestCase, 
-  TestCaseVersion, 
-  TestResult, 
+import {
+  Project,
+  TestCase,
+  TestCaseVersion,
+  TestResult,
   StepVersion,
-  TestCaseDetailPageProps 
+  TestCaseStep,
+  TestCaseDetailPageProps
 } from '@/types';
 import { ProjectService, TestCaseService } from '@/lib/api/services';
+import { Step } from '@/lib/api/interfaces';
+
+interface VersionStep extends Step {
+  disabled: boolean;
+}
+
+// Convert API step version to component version step
+const convertStepVersion = (stepVersion: StepVersion): VersionStep => ({
+  id: stepVersion.id,
+  parentId: stepVersion.stepId,
+  type: stepVersion.type || 'manual',
+  action: stepVersion.action,
+  order: stepVersion.order,
+  disabled: stepVersion.disabled ?? false,
+  data: stepVersion.data || undefined,
+  expected: stepVersion.expected || undefined,
+  selector: stepVersion.selector,
+  value: stepVersion.value,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
+});
+
+// Convert test case step to version step
+const convertTestCaseStep = (step: TestCaseStep): VersionStep => ({
+  id: step.id,
+  parentId: step.parentId || step.id,
+  type: step.type || 'manual',
+  action: step.action,
+  order: step.order,
+  disabled: step.disabled,
+  data: step.data || undefined,
+  expected: step.expected || undefined,
+  selector: step.selector,
+  value: step.value,
+  fixtureId: step.fixtureId,
+  testCaseId: step.testCaseId,
+  playwrightScript: step.playwrightScript,
+  createdAt: typeof step.createdAt === 'string' ? step.createdAt : step.createdAt.toISOString(),
+  updatedAt: typeof step.updatedAt === 'string' ? step.updatedAt : step.updatedAt.toISOString()
+});
 
 export default function TestCaseDetailPage() {
   const params = useParams();
@@ -53,20 +94,20 @@ export default function TestCaseDetailPage() {
   const projectId = params.id as string;
   const testCaseId = params.testCaseId as string;
   
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [project, setProject] = useState<Project | null>(null);
   const [testCase, setTestCase] = useState<TestCase | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
   const [versions, setVersions] = useState<TestCaseVersion[]>([]);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
   const [isViewVersionDialogOpen, setIsViewVersionDialogOpen] = useState(false);
   const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
   const [activeVersion, setActiveVersion] = useState<TestCaseVersion | null>(null);
-  const [versionSteps, setVersionSteps] = useState<StepVersion[]>([]);
-  const [isReverting, setIsReverting] = useState(false);
+  const [versionSteps, setVersionSteps] = useState<VersionStep[]>([]);
   const [activeTab, setActiveTab] = useState('steps');
   const [isRunTestDialogOpen, setIsRunTestDialogOpen] = useState(false);
-  
+
   // Khởi tạo service
   const projectService = new ProjectService();
   const testCaseService = new TestCaseService();
@@ -94,6 +135,10 @@ export default function TestCaseDetailPage() {
       if (updatedTestCase) {
         setTestCase(updatedTestCase);
       }
+      
+      // Also refresh versions when test case data is refreshed
+      const updatedVersions = await fetchTestCaseVersions(testCaseId);
+      setVersions(updatedVersions);
     } catch (error) {
       console.error('Error refreshing test case data:', error);
     }
@@ -102,7 +147,7 @@ export default function TestCaseDetailPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        setLoading(true);
+        setIsLoading(true);
         
         // Fetch all data in parallel
         const [projectData, testCaseData, versionsData, resultsData] = await Promise.all([
@@ -115,12 +160,12 @@ export default function TestCaseDetailPage() {
         setProject(projectData);
         setTestCase(testCaseData);
         setVersions(versionsData);
-        setTestResults(resultsData);
+        setTestResults(resultsData.map(convertApiTestResult));
       } catch (err) {
         console.error('Error loading test case data:', err);
-        setError('Failed to load test case data');
+        toast.error('Failed to load test case data');
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     }
     
@@ -201,21 +246,13 @@ export default function TestCaseDetailPage() {
   const handleViewVersion = async (version: TestCaseVersion) => {
     setActiveVersion(version);
     
-    // If stepVersions is already included in the version object
-    if (version.stepVersions && Array.isArray(version.stepVersions)) {
-      setVersionSteps(version.stepVersions);
-      setIsViewVersionDialogOpen(true);
-      return;
-    }
-    
-    // Otherwise fetch step versions
     try {
       const stepVersionsData = await testCaseService.getTestCaseVersionSteps(
         projectId, 
         testCaseId, 
         version.id
       );
-      setVersionSteps(stepVersionsData);
+      setVersionSteps(stepVersionsData.map(convertStepVersion));
       setIsViewVersionDialogOpen(true);
     } catch (error) {
       console.error('Error fetching step versions:', error);
@@ -276,7 +313,7 @@ export default function TestCaseDetailPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[70vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -284,7 +321,7 @@ export default function TestCaseDetailPage() {
     );
   }
 
-  if (error || !project || !testCase) {
+  if (!project || !testCase) {
     return notFound();
   }
 
@@ -415,7 +452,7 @@ export default function TestCaseDetailPage() {
         </TabsList>
         <TabsContent value="steps" className="mt-4">
           <TestStepsTable
-            steps={testCase.Steps || []}
+            steps={testCase?.Steps?.map(convertTestCaseStep) || []}
             testCaseId={testCaseId}
             projectId={projectId}
             onVersionUpdate={(newVersion) => {
@@ -538,7 +575,7 @@ export default function TestCaseDetailPage() {
                     <tbody>
                       {versionSteps.sort((a, b) => a.order - b.order).map((step) => (
                         <tr key={step.id} className="border-t">
-                          <td className="p-2">{step.order + 1}</td>
+                          <td className="p-2">{step.order}</td>
                           <td className="p-2">{step.action}</td>
                           <td className="p-2">{step.data || '-'}</td>
                           <td className="p-2">{step.expected || '-'}</td>

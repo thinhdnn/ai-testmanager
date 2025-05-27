@@ -5,7 +5,7 @@ import { checkPermission } from "@/lib/rbac/check-permission";
 // GET /api/settings/rbac/roles/[roleId] - Get role details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { roleId: string } }
+  { params }: { params: Promise<{ roleId: string }> }
 ) {
   try {
     // According to Next.js 15 docs, params must be awaited before using its properties
@@ -54,7 +54,7 @@ export async function GET(
 // PUT /api/settings/rbac/roles/[roleId] - Update role
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { roleId: string } }
+  { params }: { params: Promise<{ roleId: string }> }
 ) {
   try {
     // Check for role management permission
@@ -114,29 +114,23 @@ export async function PUT(
       });
     }
 
-    // Update permissions if provided
+    // Update role permissions if provided
     if (permissionIds) {
-      // Remove existing permissions
+      // Delete existing permissions
       await prisma.rolePermission.deleteMany({
         where: { roleId },
       });
 
       // Add new permissions
-      if (permissionIds.length > 0) {
-        const rolePermissions = permissionIds.map(
-          (permissionId: string) => ({
-            roleId,
-            permissionId,
-          })
-        );
-
-        await prisma.rolePermission.createMany({
-          data: rolePermissions,
-        });
-      }
+      await prisma.rolePermission.createMany({
+        data: permissionIds.map((permissionId: string) => ({
+          roleId,
+          permissionId,
+        })),
+      });
     }
 
-    // Get updated role
+    // Get updated role with permissions
     const updatedRole = await prisma.role.findUnique({
       where: { id: roleId },
       include: {
@@ -170,7 +164,7 @@ export async function PUT(
 // DELETE /api/settings/rbac/roles/[roleId] - Delete role
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { roleId: string } }
+  { params }: { params: Promise<{ roleId: string }> }
 ) {
   try {
     // Check for role management permission
@@ -190,11 +184,11 @@ export async function DELETE(
     const { roleId } = await params;
 
     // Check if role exists
-    const role = await prisma.role.findUnique({
+    const existingRole = await prisma.role.findUnique({
       where: { id: roleId },
     });
 
-    if (!role) {
+    if (!existingRole) {
       return NextResponse.json(
         {
           success: false,
@@ -204,7 +198,7 @@ export async function DELETE(
       );
     }
 
-    // Delete role (this will cascade and delete associated role permissions)
+    // Delete role
     await prisma.role.delete({
       where: { id: roleId },
     });

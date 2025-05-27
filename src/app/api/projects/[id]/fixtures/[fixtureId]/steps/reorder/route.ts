@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 // POST /api/projects/[id]/fixtures/[fixtureId]/steps/reorder
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string }> }
 ) {
   try {
     const paramsObj = await params;

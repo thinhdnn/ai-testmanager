@@ -5,6 +5,7 @@ import { TestCaseRepository } from '@/lib/db/repositories/test-case-repository';
 import { TestCaseVersionRepository } from '@/lib/db/repositories/test-case-version-repository';
 import { StepVersionRepository } from '@/lib/db/repositories/step-version-repository';
 import { FixtureVersionRepository } from '@/lib/db/repositories/fixture-version-repository';
+import { FixtureRepository } from '@/lib/db/repositories/fixture-repository';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { incrementVersion } from '@/lib/utils/version';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
@@ -16,34 +17,35 @@ const prisma = new PrismaClient();
 // GET /api/projects/[id]/test-cases/[testCaseId]/steps
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string }> }
 ) {
   try {
-    // In Next.js 15, params is a Promise that must be awaited
-    const params_data = await params;
-    const projectId = params_data.id;
-    const testCaseId = params_data.testCaseId;
-
-    // Check if user has permission to view test steps
-    const hasPermission = await checkResourcePermission(
-      'project',
-      'view',
-      projectId
-    );
-
+    const { id: projectId, testCaseId } = await params;
+    const hasPermission = await checkResourcePermission('project', 'view', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get test steps
     const stepRepository = new StepRepository();
-    const steps = await stepRepository.findByTestCaseId(testCaseId);
+    const testCaseRepository = new TestCaseRepository();
 
+    // Get the test case
+    const testCase = await testCaseRepository.findById(testCaseId);
+    if (!testCase) {
+      return NextResponse.json({ error: 'Test case not found' }, { status: 404 });
+    }
+
+    // Verify that this test case belongs to the specified project
+    if (testCase.projectId !== projectId) {
+      return NextResponse.json({ error: 'Test case not found in this project' }, { status: 404 });
+    }
+
+    const steps = await stepRepository.findByTestCaseId(testCaseId);
     return NextResponse.json(steps);
   } catch (error) {
-    console.error('Error fetching test steps:', error);
+    console.error('Error fetching test case steps:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch test steps' },
+      { error: 'Failed to fetch test case steps' },
       { status: 500 }
     );
   }
@@ -52,115 +54,86 @@ export async function GET(
 // POST /api/projects/[id]/test-cases/[testCaseId]/steps
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string }> }
 ) {
   try {
-    // In Next.js 15, params is a Promise that must be awaited
-    const params_data = await params;
-    const projectId = params_data.id;
-    const testCaseId = params_data.testCaseId;
-    
+    const { id: projectId, testCaseId } = await params;
     const userEmail = await getCurrentUserEmail();
     
-    // Check if user has permission to update test steps
-    const hasPermission = await checkResourcePermission(
-      'project',
-      'update',
-      projectId
-    );
-
+    // Check permission
+    const hasPermission = await checkResourcePermission('project', 'update', projectId);
     if (!hasPermission) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { action, data, expected, fixtureId, playwrightScript } = body;
+    const { action, data, expected, order, disabled, fixtureId, playwrightScript } = await request.json();
 
-    // Validate required fields
-    if (!action) {
-      return NextResponse.json(
-        { error: 'Action is required' },
-        { status: 400 }
-      );
-    }
-
-    // Get the highest order number to append this step
     const stepRepository = new StepRepository();
     const testCaseRepository = new TestCaseRepository();
     const testCaseVersionRepository = new TestCaseVersionRepository();
     const stepVersionRepository = new StepVersionRepository();
-    const fixtureVersionRepository = new FixtureVersionRepository();
-    
-    const steps = await stepRepository.findByTestCaseId(testCaseId);
-    const maxOrderStep = steps.length > 0 ? steps.reduce((max, step) => step.order > max.order ? step : max, steps[0]) : null;
-    const nextOrder = maxOrderStep ? maxOrderStep.order + 1 : 0;
 
-    // Create step
+    // Get the test case
+    const testCase = await testCaseRepository.findById(testCaseId);
+    if (!testCase) {
+      return NextResponse.json({ error: 'Test case not found' }, { status: 404 });
+    }
+
+    // Get all existing steps to determine the next order value
+    const existingSteps = await stepRepository.findByTestCaseId(testCaseId);
+    const maxOrder = existingSteps.reduce((max, step) => 
+      step.order > max ? step.order : max, 
+      0
+    );
+    const nextOrder = maxOrder + 1;
+
+    // Create the step
     const step = await stepRepository.create({
       testCaseId,
       action,
       data,
       expected,
+      order: order || nextOrder, // Use provided order or calculate next order
+      disabled: disabled || false,
       fixtureId,
       playwrightScript,
-      order: nextOrder,
       createdBy: userEmail,
       updatedBy: userEmail
     });
 
-    // Update the test case version
-    const testCase = await testCaseRepository.findById(testCaseId);
+    // Increment test case version
+    const newVersion = incrementVersion(testCase.version);
+    
+    // Update test case with new version
+    await testCaseRepository.update(testCaseId, {
+      version: newVersion,
+      updatedBy: userEmail
+    });
 
-    if (testCase) {
-      // Increment the version using the utility function
-      const newVersion = incrementVersion(testCase.version);
-      
-      // Update test case with new version
-      await testCaseRepository.update(testCaseId, {
-        version: newVersion,
-        updatedBy: userEmail
-      });
+    // Create a new test case version
+    const latestVersion = await testCaseVersionRepository.create({
+      testCaseId,
+      version: newVersion,
+      name: testCase.name,
+      createdBy: userEmail
+    });
 
-      // Create a new test case version
-      const latestVersion = await testCaseVersionRepository.create({
-        testCaseId,
-        version: newVersion,
-        name: testCase.name,
-        createdBy: userEmail
-      });
+    // Get all current steps for this test case
+    const allSteps = await stepRepository.findByTestCaseId(testCaseId);
 
-      // Get all steps including the new one
-      const allSteps = await stepRepository.findByTestCaseId(testCaseId);
-      
-      // Create step versions for ALL steps, not just the new one
-      if (latestVersion) {
-        for (const existingStep of allSteps) {
-          // If this step references a fixture, find the latest fixture version
-          let fixtureVersionId = undefined;
-          if (existingStep.fixtureId) {
-            try {
-              const latestFixtureVersion = await fixtureVersionRepository.findLatestByFixtureId(existingStep.fixtureId);
-              if (latestFixtureVersion) {
-                fixtureVersionId = latestFixtureVersion.id;
-              } else {
-                console.warn(`No fixture version found for fixture ID: ${existingStep.fixtureId}`);
-              }
-            } catch (error) {
-              console.error(`Error fetching fixture version for fixture ID: ${existingStep.fixtureId}`, error);
-            }
-          }
-          
-          await stepVersionRepository.create({
-            testCaseVersionId: latestVersion.id,
-            fixtureVersionId: fixtureVersionId,
-            action: existingStep.action,
-            data: existingStep.data || undefined,
-            expected: existingStep.expected || undefined,
-            order: existingStep.order,
-            disabled: existingStep.disabled || false,
-            createdBy: userEmail
-          });
-        }
+    // Create versions for all steps
+    if (latestVersion) {
+      for (const currentStep of allSteps) {
+        await stepVersionRepository.create({
+          testCaseVersionId: latestVersion.id,
+          fixtureVersionId: currentStep.fixtureId || undefined,
+          action: currentStep.action,
+          data: currentStep.data || undefined,
+          expected: currentStep.expected || undefined,
+          order: currentStep.order,
+          disabled: currentStep.disabled || false,
+          createdBy: userEmail
+        });
       }
     }
 
@@ -168,36 +141,20 @@ export async function POST(
     if (testCase && !testCase.isManual) {
       try {
         console.log(`Updating test file for test case ID: ${testCaseId}`);
-        
-        // Get project information
-        const project = await prisma.project.findUnique({
-          where: { id: projectId }
-        });
-
-        if (project && project.playwrightProjectPath) {
-          // Convert relative path to absolute path
-          const appRoot = process.cwd();
-          const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
-          const testManager = new TestManagerService(absoluteProjectPath);
-          await testManager.createTestFile(testCaseId);
-          console.log(`Test file updated successfully for test case ID: ${testCaseId}`);
-        } else {
-          console.error('Project not found or Playwright project path is not set');
-        }
+        const testManager = new TestManagerService(process.cwd());
+        await testManager.createTestFile(testCaseId);
+        console.log(`Test file updated successfully for test case ID: ${testCaseId}`);
       } catch (fileError) {
         console.error('Error updating test file:', fileError);
         // We don't fail the request if file update fails
       }
     }
 
-    return NextResponse.json({ 
-      step,
-      version: testCase ? incrementVersion(testCase.version) : undefined 
-    }, { status: 201 });
+    return NextResponse.json(step);
   } catch (error) {
-    console.error('Error creating test step:', error);
+    console.error('Error creating step:', error);
     return NextResponse.json(
-      { error: 'Failed to create test step' },
+      { error: 'Failed to create step' },
       { status: 500 }
     );
   }

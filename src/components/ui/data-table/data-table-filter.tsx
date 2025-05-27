@@ -2,6 +2,7 @@
 
 import { Table } from "@tanstack/react-table";
 import { X } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ interface DataTableFilterProps<TData> {
     options: {
       label: string;
       value: string;
-      icon?: React.ReactNode;
+      icon?: LucideIcon;
     }[];
   };
 }

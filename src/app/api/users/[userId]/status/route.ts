@@ -5,7 +5,7 @@ import { getCurrentUserEmail } from "@/lib/auth/session";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // Check if the user has permission to update users

@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 // POST /api/projects/[id]/fixtures/[fixtureId]/steps/duplicate/[stepId]
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string; stepId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string; stepId: string }> }
 ) {
   try {
     const paramsObj = await params;
@@ -64,7 +64,7 @@ export async function POST(
     // Create a duplicate of the step
     const duplicatedStep = await stepRepository.create({
       fixtureId,
-      action: `${stepToDuplicate.action} (Copy)`,
+      action: stepToDuplicate.action,
       data: stepToDuplicate.data || undefined,
       expected: stepToDuplicate.expected || undefined,
       playwrightScript: stepToDuplicate.playwrightScript || undefined,

@@ -43,11 +43,7 @@ const fixtureVersionRepository = new FixtureVersionRepository();
  */
 export async function GET(
   request: NextRequest,
-  {
-    params,
-  }: {
-    params: { id: string; fixtureId: string; versionId: string };
-  }
+  { params }: { params: Promise<{ id: string; fixtureId: string; versionId: string }> }
 ) {
   const { id: projectId, fixtureId, versionId } = await params;
 

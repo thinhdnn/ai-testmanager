@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { AlertCircle, LogIn, Lock, User } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
@@ -176,6 +176,14 @@ export default function SignInPage() {
   );
 }
 
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignInContent />
+    </Suspense>
+  );
+}
+
 // Helper function to validate and process the callback URL
 function useSafeCallbackUrl(callbackUrl: string | null): string {
   const defaultUrl = "/dashboard";
@@ -205,13 +213,21 @@ function useSafeCallbackUrl(callbackUrl: string | null): string {
           return defaultUrl;
         }
       }
+    }
+    
+    // If it's a relative URL starting with /, it's safe to use
+    if (decodedUrl.startsWith('/') && !decodedUrl.includes('://')) {
+      return decodedUrl;
+    }
+    
+    // For absolute URLs, check if they're for our domain (you can add your domain check here)
+    // For now, we'll just return the default URL for absolute URLs
+    if (decodedUrl.includes('://')) {
       return defaultUrl;
     }
     
-    // Not a recursive URL, use as is
-    return decodedUrl;
+    return defaultUrl;
   } catch {
-    // If decoding fails, return the default URL
     return defaultUrl;
   }
 } 

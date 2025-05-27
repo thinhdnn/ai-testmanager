@@ -6,7 +6,7 @@ import { getCurrentUserEmail } from "@/lib/auth/session";
 // Get a single user by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // Check if the user has permission to read users
@@ -56,7 +56,7 @@ export async function GET(
 // Update user by ID
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // Check if the user has permission to update users
@@ -72,7 +72,7 @@ export async function PUT(
 
     // According to Next.js 15 docs, params must be awaited before using its properties
     const { userId } = await params;
-    const data = await req.json();
+    const { username, email, roleIds } = await req.json();
 
     // Check if the user exists
     const existingUser = await prisma.user.findUnique({
@@ -86,18 +86,49 @@ export async function PUT(
       );
     }
 
+    // Check if username is already taken by another user
+    if (username && username !== existingUser.username) {
+      const userWithSameUsername = await prisma.user.findUnique({
+        where: { username },
+      });
+
+      if (userWithSameUsername) {
+        return NextResponse.json(
+          { error: "Username already exists" },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Update user roles if provided
+    if (roleIds) {
+      // Delete existing role assignments
+      await prisma.userRole.deleteMany({
+        where: { userId },
+      });
+
+      // Create new role assignments
+      await prisma.userRole.createMany({
+        data: roleIds.map((roleId: string) => ({
+          userId,
+          roleId,
+        })),
+      });
+    }
+
     // Update user
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        ...data,
+        username,
+        email,
         updatedBy: userEmail || undefined,
       },
       include: {
         roles: {
           include: {
-            role: true
-          }
+            role: true,
+          },
         },
       },
     });
@@ -118,7 +149,7 @@ export async function PUT(
 // Delete user by ID
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // Check if the user has permission to delete users

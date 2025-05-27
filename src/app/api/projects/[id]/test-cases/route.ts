@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkResourcePermission } from '@/lib/rbac/check-permission';
 import { TestCaseRepository } from '@/lib/db/repositories/test-case-repository';
+import { TestCaseVersionRepository } from '@/lib/db/repositories/test-case-version-repository';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/db/prisma';
 import path from 'path';
-
-const prisma = new PrismaClient();
 
 // GET /api/projects/[id]/test-cases
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // In Next.js 15, params is a Promise that must be awaited
-    const params_data = await params;
-    const projectId = params_data.id;
+    const { id: projectId } = await params;
     
+    // Check permission
+    const hasPermission = await checkResourcePermission('project', 'view', projectId);
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const testCaseRepository = new TestCaseRepository();
     const testCases = await testCaseRepository.findByProjectId(projectId);
-
     return NextResponse.json(testCases);
   } catch (error) {
     console.error('Error fetching test cases:', error);
@@ -33,33 +36,42 @@ export async function GET(
 // POST /api/projects/[id]/test-cases
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // In Next.js 15, params is a Promise that must be awaited
-    const params_data = await params;
-    const projectId = params_data.id;
-    
+    const { id: projectId } = await params;
     const userEmail = await getCurrentUserEmail();
-    const data = await request.json();
     
-    // Validate required fields
-    if (!data.name) {
-      return NextResponse.json(
-        { error: 'Name is required' },
-        { status: 400 }
-      );
+    // Check permission
+    const hasPermission = await checkResourcePermission('project', 'update', projectId);
+    if (!hasPermission) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const { name, isManual, tags } = await request.json();
     const testCaseRepository = new TestCaseRepository();
+    const testCaseVersionRepository = new TestCaseVersionRepository();
+
+    // Create the test case
     const testCase = await testCaseRepository.create({
-      name: data.name,
-      status: data.status || 'pending',
-      isManual: data.isManual === true,
-      tags: data.tags || null,
-      projectId: projectId, // Use the extracted projectId here
+      name,
+      projectId,
+      isManual: isManual || false,
+      tags: Array.isArray(tags) ? tags.join(',') : tags,
       createdBy: userEmail,
       updatedBy: userEmail,
+      version: '1.0.0'
+    });
+
+    // Create initial version with empty steps array
+    await testCaseVersionRepository.create({
+      testCaseId: testCase.id,
+      version: testCase.version,
+      name: testCase.name,
+      createdBy: userEmail,
+      stepVersions: {
+        create: [] // Initialize with empty steps array
+      }
     });
 
     // Create test file for automated tests if not manual
@@ -89,7 +101,7 @@ export async function POST(
       }
     }
 
-    return NextResponse.json(testCase, { status: 201 });
+    return NextResponse.json(testCase);
   } catch (error) {
     console.error('Error creating test case:', error);
     return NextResponse.json(

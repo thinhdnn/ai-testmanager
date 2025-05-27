@@ -28,16 +28,16 @@ interface TestCasesResponse {
 }
 
 interface Props {
-  params: {
+  params: Promise<{
     id: string;
-  };
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     page?: string;
     limit?: string;
     search?: string;
     status?: string;
     tags?: string;
-  };
+  }>;
 }
 
 // Fetch project from API - keeping just for metadata generation
@@ -59,8 +59,9 @@ async function fetchProject(projectId: string): Promise<any> {
 }
 
 // Fetch test cases from API
-async function fetchTestCases(projectId: string, searchParamsData: Props['searchParams']): Promise<TestCasesResponse> {
+async function fetchTestCases(projectId: string, searchParamsPromise: Props['searchParams']): Promise<TestCasesResponse> {
   try {
+    const searchParamsData = await searchParamsPromise;
     const page = searchParamsData.page ? parseInt(searchParamsData.page) : 1;
     const limit = searchParamsData.limit ? parseInt(searchParamsData.limit) : 10;
     const searchParams = new URLSearchParams();
@@ -131,7 +132,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TestCasesPage({ params, searchParams }: Props) {
   const paramsData = await params;
-  const searchParamsData = await searchParams;
   const id = paramsData.id;
   
   // Fetch project data
@@ -142,7 +142,7 @@ export default async function TestCasesPage({ params, searchParams }: Props) {
   }
   
   // Fetch test cases
-  const testCasesData = await fetchTestCases(id, searchParamsData);
+  const testCasesData = await fetchTestCases(id, searchParams);
   
   // Ensure we have testCases array or provide a default empty array
   const testCases = testCasesData?.testCases || [];

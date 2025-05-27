@@ -27,7 +27,7 @@ function toCamelCase(str: string): string {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string }> }
 ) {
   try {
     const resolvedParams = await params;
@@ -89,7 +89,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string }> }
 ) {
   try {
     const resolvedParams = await params;
@@ -214,7 +214,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; fixtureId: string } }
+  { params }: { params: Promise<{ id: string; fixtureId: string }> }
 ) {
   try {
     const resolvedParams = await params;

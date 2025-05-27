@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
 // GET /api/projects/[id]/test-cases/[testCaseId]
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string; testCaseId: string } }
+  context: { params: Promise<{ id: string; testCaseId: string }> }
 ) {
   try {
     // Wait for params to be available
@@ -55,7 +55,7 @@ export async function GET(
 // PUT /api/projects/[id]/test-cases/[testCaseId]
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string; testCaseId: string } }
+  context: { params: Promise<{ id: string; testCaseId: string }> }
 ) {
   try {
     // Wait for params to be available
@@ -144,7 +144,7 @@ export async function PUT(
 // DELETE /api/projects/[id]/test-cases/[testCaseId]
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string; testCaseId: string } }
+  context: { params: Promise<{ id: string; testCaseId: string }> }
 ) {
   try {
     // Wait for params to be available

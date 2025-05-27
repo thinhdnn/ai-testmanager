@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Column } from "@tanstack/react-table";
 import { Check, PlusCircle } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ interface DataTableFacetedFilterProps<TData, TValue> {
   options: {
     label: string;
     value: string;
-    icon?: React.ReactNode;
+    icon?: LucideIcon;
   }[];
 }
 

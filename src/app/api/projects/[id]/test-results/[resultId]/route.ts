@@ -4,13 +4,11 @@ import { TestResultRepository } from '@/lib/db/repositories/test-result-reposito
 // GET /api/projects/[id]/test-results/[resultId]
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string; resultId: string } }
+  { params }: { params: Promise<{ id: string; resultId: string }> }
 ) {
   try {
     // Wait for params to be available
-    const params = await Promise.resolve(context.params);
-    const projectId = params.id;
-    const resultId = params.resultId;
+    const { id: projectId, resultId } = await params;
     
     if (!projectId || !resultId) {
       return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 });

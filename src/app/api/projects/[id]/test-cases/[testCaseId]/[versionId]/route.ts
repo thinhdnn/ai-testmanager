@@ -6,10 +6,10 @@ import { getCurrentUserEmail } from '@/lib/auth/session';
 // GET /api/projects/[id]/test-cases/[testCaseId]/[versionId]
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string; versionId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string; versionId: string }> }
 ) {
   try {
-    const { id: projectId, testCaseId, versionId } = params;
+    const { id: projectId, testCaseId, versionId } = await params;
     
     // Check permission
     const hasPermission = await checkResourcePermission('project', 'view', projectId);
@@ -37,10 +37,10 @@ export async function GET(
 // PUT /api/projects/[id]/test-cases/[testCaseId]/[versionId]
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string; versionId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string; versionId: string }> }
 ) {
   try {
-    const { id: projectId, testCaseId, versionId } = params;
+    const { id: projectId, testCaseId, versionId } = await params;
     const userEmail = await getCurrentUserEmail();
     
     // Check permission
@@ -87,10 +87,10 @@ export async function PUT(
 // DELETE /api/projects/[id]/test-cases/[testCaseId]/[versionId]
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; testCaseId: string; versionId: string } }
+  { params }: { params: Promise<{ id: string; testCaseId: string; versionId: string }> }
 ) {
   try {
-    const { id: projectId, testCaseId, versionId } = params;
+    const { id: projectId, testCaseId, versionId } = await params;
     
     // Check permission
     const hasPermission = await checkResourcePermission('project', 'update', projectId);
