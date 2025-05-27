@@ -276,4 +276,20 @@ export class TestCaseService {
   async createProjectTag(projectId: string, value: string): Promise<any> {
     return this.apiClient.post<any>(`/projects/${projectId}/tags`, { value });
   }
+
+  async getTestFileContent(projectId: string, testCaseId: string): Promise<string> {
+    const response = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}/file`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch test file content');
+    }
+
+    const data = await response.json();
+    return data.content;
+  }
 } 

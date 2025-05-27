@@ -3,9 +3,9 @@ import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import Handlebars from 'handlebars';
+import { PLAYWRIGHT_PROJECT_PATH } from '@/lib/utils/config';
 
 const execAsync = promisify(exec);
-const PLAYWRIGHT_PROJECT_PATH = process.env.PLAYWRIGHT_PROJECT_PATH || 'playwright-projects';
 
 function sanitizeFolderName(name: string): string {
   return name

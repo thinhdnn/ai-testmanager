@@ -107,6 +107,8 @@ export default function TestCaseDetailPage() {
   const [versionSteps, setVersionSteps] = useState<VersionStep[]>([]);
   const [activeTab, setActiveTab] = useState('steps');
   const [isRunTestDialogOpen, setIsRunTestDialogOpen] = useState(false);
+  const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
+  const [fileContent, setFileContent] = useState<string | null>(null);
 
   // Khởi tạo service
   const projectService = new ProjectService();
@@ -313,6 +315,20 @@ export default function TestCaseDetailPage() {
     }
   };
 
+  const handleViewCode = async () => {
+    try {
+      setIsLoading(true);
+      const content = await testCaseService.getTestFileContent(projectId, testCaseId);
+      setFileContent(content);
+      setIsCodeDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to load test file:', error);
+      toast.error('Failed to load test file content');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[70vh]">
@@ -397,9 +413,14 @@ export default function TestCaseDetailPage() {
                 Run Test
               </Button>
               {!testCase.isManual && (
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleViewCode}
+                  disabled={isLoading}
+                >
                   <FileCode className="mr-2 h-4 w-4" />
-                  View Generated Code
+                  {isLoading ? 'Loading...' : 'View Generated Code'}
                 </Button>
               )}
             </div>
@@ -650,6 +671,34 @@ export default function TestCaseDetailPage() {
         mode="file"
         testCaseId={testCaseId}
       />
+
+      <Dialog open={isCodeDialogOpen} onOpenChange={setIsCodeDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Generated Test Code</DialogTitle>
+          </DialogHeader>
+          <div className="relative">
+            <pre className="rounded-md bg-slate-950 p-4">
+              <code className="text-sm font-mono text-slate-50 whitespace-pre-wrap">
+                {fileContent || 'No test file content available'}
+              </code>
+            </pre>
+            {fileContent && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute top-2 right-2"
+                onClick={() => {
+                  navigator.clipboard.writeText(fileContent);
+                  toast.success('Code copied to clipboard');
+                }}
+              >
+                Copy
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
