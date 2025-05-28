@@ -31,6 +31,7 @@ export interface TestResult {
   createdAt: string | Date;
   browser: string | null;
   videoUrl: string | null;
+  screenshot?: string | null;
 }
 
 export interface FixturePageProps {

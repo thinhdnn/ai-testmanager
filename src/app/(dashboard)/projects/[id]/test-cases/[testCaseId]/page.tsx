@@ -48,6 +48,7 @@ import {
 } from '@/types';
 import { ProjectService, TestCaseService } from '@/lib/api/services';
 import { Step } from '@/lib/api/interfaces';
+import { TestResultDialog } from '@/components/test-case/test-result-dialog';
 
 interface VersionStep extends Step {
   disabled: boolean;
@@ -109,6 +110,8 @@ export default function TestCaseDetailPage() {
   const [isRunTestDialogOpen, setIsRunTestDialogOpen] = useState(false);
   const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [selectedTestResult, setSelectedTestResult] = useState<TestResult | null>(null);
+  const [isTestResultDialogOpen, setIsTestResultDialogOpen] = useState(false);
 
   // Khởi tạo service
   const projectService = new ProjectService();
@@ -556,7 +559,16 @@ export default function TestCaseDetailPage() {
                           Duration: {result.executionTime ? `${result.executionTime}ms` : 'N/A'}
                         </p>
                       </div>
-                      <Button variant="outline" size="sm">View Details</Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedTestResult(result);
+                          setIsTestResultDialogOpen(true);
+                        }}
+                      >
+                        View Details
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -567,6 +579,13 @@ export default function TestCaseDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Test Result Dialog */}
+      <TestResultDialog
+        isOpen={isTestResultDialogOpen}
+        onClose={() => setIsTestResultDialogOpen(false)}
+        testResult={selectedTestResult}
+      />
       
       {/* Version Details Dialog */}
       <Dialog open={isViewVersionDialogOpen} onOpenChange={setIsViewVersionDialogOpen}>
