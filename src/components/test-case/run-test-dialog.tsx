@@ -299,155 +299,63 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
   
   // Effect to poll for test result updates
   useEffect(() => {
-    if (testResultId && isResultDialogOpen) {
-      let retryCount = 0;
-      const maxRetries = 30;
-      let lastStatus = '';
-      let lastOutput = '';
-      let noChangeCount = 0;
-      const maxNoChange = 10;
-      const startTime = Date.now();
-      const maxTestDuration = 3000;
+    // Only poll for background mode until test completion
+    if (testResultId && isResultDialogOpen && !isRunning && runMode === 'background') {
+      console.log('Starting polling for background test result:', testResultId);
 
       // First, fetch immediately
       fetchTestResult(testResultId);
       
-      // Then set up polling
+      // Then set up polling every 2 seconds until completion
       const interval = setInterval(async () => {
         try {
           const apiResult = await testCaseService.getTestResult(projectId, testResultId);
           console.log('Poll result:', {
             status: apiResult.status,
-            hasOutput: !!apiResult.output,
-            outputLength: apiResult.output?.length || 0,
-            hasError: !!apiResult.errorMessage,
-            executionTime: Date.now() - startTime
+            hasOutput: !!apiResult.output
           });
           
-          // Check if test has been running too long
-          const executionTime = Date.now() - startTime;
-          if (executionTime > maxTestDuration && apiResult.status === 'running') {
-            console.log(`Test execution time ${executionTime}ms exceeded maximum ${maxTestDuration}ms`);
-            if (pollingInterval) {
-              clearInterval(pollingInterval);
-              setPollingInterval(null);
-            }
-            setTestResult(prev => prev ? {
-              ...prev,
-              status: 'stalled',
-              errorMessage: 'Test execution exceeded maximum time limit. The process might still be running in the background.'
-            } : null);
-            return;
-          }
-
-          // Check if output has changed
-          const hasNewOutput = apiResult.output !== lastOutput;
-          if (hasNewOutput) {
-            console.log('New output detected');
-            noChangeCount = 0;
-            lastOutput = apiResult.output || '';
-          } else {
-            noChangeCount++;
-            console.log(`No changes for ${noChangeCount} polls`);
-          }
-
-          // For quick tests (< 5s), stop polling if no changes after 3 attempts
-          if (executionTime < 5000 && noChangeCount >= 3 && apiResult.output && apiResult.output.includes('Running 1 test')) {
-            console.log('Quick test detected with no recent changes, stopping polling');
-            if (pollingInterval) {
-              clearInterval(pollingInterval);
-              setPollingInterval(null);
-            }
-            // Mark as completed if we have output
-            setTestResult(prev => prev ? {
-              ...prev,
-              status: 'completed',
-              success: !apiResult.errorMessage,
-              executionTime: executionTime
-            } : null);
-            return;
-          }
-
-          // If status hasn't changed and no new output after several retries, consider it stalled
-          if (apiResult.status === lastStatus && !hasNewOutput) {
-            if (noChangeCount >= maxNoChange) {
-              console.log('No changes detected for too long, considering test stalled');
-              if (pollingInterval) {
-                clearInterval(pollingInterval);
-                setPollingInterval(null);
-              }
-
-              // Only update to stalled if test is still running
-              if (apiResult.status === 'running') {
-                setTestResult(prev => prev ? {
-                  ...prev,
-                  status: 'stalled',
-                  errorMessage: 'Test appears to be stalled. The process might still be running but is not producing output.'
-                } : null);
-              }
-              return;
-            }
-          } else {
-            // Reset counts if status changed or new output
-            if (apiResult.status !== lastStatus) {
-              console.log(`Status changed from ${lastStatus} to ${apiResult.status}`);
-              retryCount = 0;
-              lastStatus = apiResult.status;
-            }
-          }
-
           // Convert API result to component's TestResult format
           const result: LocalTestResult = {
             id: apiResult.id,
             status: apiResult.status,
             success: apiResult.success,
-            executionTime: apiResult.executionTime || executionTime,
+            executionTime: apiResult.executionTime || null,
             createdAt: new Date(apiResult.createdAt),
             errorMessage: apiResult.errorMessage || apiResult.error || null,
             output: apiResult.output || null,
             browser: apiResult.browser || null,
             videoUrl: apiResult.videoUrl,
             screenshot: apiResult.screenshot,
-            // testCaseExecutions: apiResult.testCaseExecutions || []
           };
           
           setTestResult(result);
           
-          // Stop polling if test is complete or failed
-          if (result.status === 'completed' || result.status === 'failed') {
-            console.log(`Test ${result.status}, stopping polling`);
-            if (pollingInterval) {
-              clearInterval(pollingInterval);
-              setPollingInterval(null);
-            }
+          // Stop polling immediately when test is completed or failed
+          if (apiResult.status === 'completed' || apiResult.status === 'failed') {
+            console.log(`Test ${apiResult.status}, stopping polling`);
+            clearInterval(interval);
+            setPollingInterval(null);
           }
+          
         } catch (error) {
           console.error('Error fetching test result:', error);
-          retryCount++;
-          if (retryCount >= maxRetries) {
-            console.log('Max retries reached, stopping polling');
-            if (pollingInterval) {
-              clearInterval(pollingInterval);
-              setPollingInterval(null);
-            }
-            setTestResult(prev => prev ? {
-              ...prev,
-              status: 'failed',
-              errorMessage: 'Failed to fetch test results after multiple retries. The test might still be running in the background.'
-            } : null);
-          }
+          // Stop polling on error to avoid spam
+          clearInterval(interval);
+          setPollingInterval(null);
         }
       }, 2000);
       
       setPollingInterval(interval);
       
       return () => {
+        console.log('Cleaning up polling interval');
         if (interval) {
           clearInterval(interval);
         }
       };
     }
-  }, [testResultId, isResultDialogOpen, projectId]);
+  }, [testResultId, isResultDialogOpen, isRunning, runMode]);
   
   // Function to fetch test result
   async function fetchTestResult(resultId: string) {
@@ -469,7 +377,6 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
         browser: apiResult.browser || null,
         videoUrl: apiResult.videoUrl,
         screenshot: apiResult.screenshot,
-        // testCaseExecutions: apiResult.testCaseExecutions || []
       };
       
       // Debug log to see the result object we're setting
@@ -481,20 +388,13 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
         console.log('Test has output logs or errors, switching to logs tab');
         setActiveTab('logs');
       } else if (result.videoUrl || result.screenshot) {
-        // If we have media but no logs, show the media tab
+        // If we have media but no logs, show the results tab
         console.log('Test has media, switching to results tab');
         setActiveTab('results');
       }
       
       setTestResult(result);
       
-      // If status is 'completed' or 'failed', stop polling
-      if (result.status === 'completed' || result.status === 'failed') {
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
-        }
-      }
     } catch (error) {
       console.error('Error fetching test result:', error);
       // Don't show an error toast to avoid spamming the user during polling

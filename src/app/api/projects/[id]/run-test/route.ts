@@ -63,7 +63,7 @@ export async function POST(
         status: 'running',
         success: false,
         browser: browser,
-        name: testRunName || null,
+        ...(testRunName ? { name: testRunName } : {}),
         ...(mode === 'file' && testCaseId ? {
           testCaseExecutions: {
             create: [{
@@ -110,10 +110,6 @@ export async function POST(
     }>((resolve, reject) => {
       let output = '';
       let errorOutput = '';
-      let testStarted = false;
-      let testCompleted = false;
-      let testPassed = false;
-      let failureDetected = false;
       const startTime = Date.now();
 
       try {
@@ -129,18 +125,6 @@ export async function POST(
           const text = data.toString();
           output += text;
           console.log('Test output:', text);
-
-          if (text.includes('Running 1 test') || text.includes('Running tests')) {
-            testStarted = true;
-          }
-          if (text.includes('1 passed') || text.includes('tests passed')) {
-            testCompleted = true;
-            testPassed = true;
-          }
-          if (text.includes('1 failed') || text.includes('tests failed') || text.includes('Test failed')) {
-            testCompleted = true;
-            failureDetected = true;
-          }
         });
 
         childProcess.stderr?.on('data', (data) => {
@@ -155,22 +139,35 @@ export async function POST(
 
         childProcess.on('exit', (code, signal) => {
           const executionTime = Date.now() - startTime;
-          if (!testCompleted) {
-            // Test didn't complete normally
-            resolve({
-              success: false,
-              output,
-              errorOutput: `Process ${signal ? `terminated with signal ${signal}` : `exited with code ${code}`}`,
-              executionTime
-            });
+          let success = false;
+          
+          // Check exit code first - 0 means success
+          if (code === 0) {
+            // For JSON reporter, try to parse the output to get more details
+            try {
+              const jsonOutput = JSON.parse(output);
+              if (jsonOutput.stats) {
+                // Check if all tests passed (no unexpected failures)
+                success = jsonOutput.stats.unexpected === 0 && jsonOutput.stats.expected > 0;
+              } else {
+                // Fallback: if exit code is 0, consider it success
+                success = true;
+              }
+            } catch (jsonError) {
+              // If JSON parsing fails but exit code is 0, still consider it success
+              console.log('Could not parse JSON output, but exit code is 0, considering success');
+              success = true;
+            }
           } else {
-            resolve({
-              success: testPassed,
-              output,
-              errorOutput,
-              executionTime
-            });
+            success = false;
           }
+          
+          resolve({
+            success,
+            output,
+            errorOutput: errorOutput || (code !== 0 ? `Process exited with code ${code}` : ''),
+            executionTime
+          });
         });
       } catch (error) {
         reject(error);
@@ -183,7 +180,7 @@ export async function POST(
         const result = await executeTest();
         
         // Update test result with final status
-        testResult = await prisma.testResultHistory.update({
+        await prisma.testResultHistory.update({
           where: { id: testResult.id },
           data: {
             status: 'completed',
@@ -191,19 +188,87 @@ export async function POST(
             output: result.output.substring(0, 10000),
             errorMessage: result.errorOutput || null,
             executionTime: result.executionTime,
-            testCaseExecutions: {
-              updateMany: {
-                where: { testResultId: testResult.id },
-                data: {
-                  status: result.success ? 'passed' : 'failed',
-                  duration: result.executionTime,
-                  output: result.output,
-                  errorMessage: result.errorOutput || null,
-                  endTime: new Date()
+          }
+        });
+
+        // Fetch testCaseExecutions separately
+        const executions = await prisma.testCaseExecution.findMany({
+          where: { testResultId: testResult.id },
+          include: {
+            testCase: true
+          }
+        });
+
+        // Update individual test case executions based on JSON results
+        try {
+          const jsonOutput = JSON.parse(result.output);
+          if (jsonOutput.suites && executions.length > 0) {
+            for (const execution of executions) {
+              let testCaseSuccess = result.success; // Default to overall result
+              let testCaseDuration = result.executionTime;
+              let testCaseError = result.errorOutput || null;
+
+              // Try to find specific test case result in JSON output
+              for (const suite of jsonOutput.suites) {
+                for (const spec of suite.specs) {
+                  // Match by test case name
+                  if (spec.title === execution.testCase.name) {
+                    testCaseSuccess = spec.ok;
+                    if (spec.tests && spec.tests.length > 0 && spec.tests[0].results && spec.tests[0].results.length > 0) {
+                      const testResult = spec.tests[0].results[0];
+                      testCaseDuration = testResult.duration || result.executionTime;
+                      testCaseError = testResult.errors && testResult.errors.length > 0 
+                        ? testResult.errors.map((e: any) => e.message).join('; ')
+                        : null;
+                    }
+                    break;
+                  }
                 }
               }
+
+              // Update the test case execution
+              await prisma.testCaseExecution.update({
+                where: { id: execution.id },
+                data: {
+                  status: testCaseSuccess ? 'passed' : 'failed',
+                  duration: testCaseDuration,
+                  output: result.output,
+                  errorMessage: testCaseError,
+                  endTime: new Date()
+                }
+              });
             }
-          },
+          } else {
+            // Fallback: update all test case executions with the overall result
+            await prisma.testCaseExecution.updateMany({
+              where: { testResultId: testResult.id },
+              data: {
+                status: result.success ? 'passed' : 'failed',
+                duration: result.executionTime,
+                output: result.output,
+                errorMessage: result.errorOutput || null,
+                endTime: new Date()
+              }
+            });
+          }
+        } catch (jsonError) {
+          console.log('Could not parse JSON for individual test results, using overall result');
+          // Fallback: update all test case executions with the overall result
+          await prisma.testCaseExecution.updateMany({
+            where: { testResultId: testResult.id },
+            data: {
+              status: result.success ? 'passed' : 'failed',
+              duration: result.executionTime,
+              output: result.output,
+              errorMessage: result.errorOutput || null,
+              endTime: new Date()
+            }
+          });
+        }
+
+        // Get the final result with executions
+        const finalResult = await prisma.testResultHistory.findUnique({
+          where: { id: testResult.id },
           include: {
             testCaseExecutions: {
               include: {
@@ -224,7 +289,7 @@ export async function POST(
         return NextResponse.json({ 
           message: 'Test execution completed',
           testResultId: testResult.id,
-          result: testResult
+          result: finalResult
         });
       } catch (error) {
         // Update test result with error status
@@ -251,19 +316,87 @@ export async function POST(
               output: result.output.substring(0, 10000),
               errorMessage: result.errorOutput || null,
               executionTime: result.executionTime,
-              testCaseExecutions: {
-                updateMany: {
-                  where: { testResultId: testResult.id },
-                  data: {
-                    status: result.success ? 'passed' : 'failed',
-                    duration: result.executionTime,
-                    output: result.output,
-                    errorMessage: result.errorOutput || null,
-                    endTime: new Date()
+            }
+          });
+
+          // Fetch testCaseExecutions separately
+          const executions = await prisma.testCaseExecution.findMany({
+            where: { testResultId: testResult.id },
+            include: {
+              testCase: true
+            }
+          });
+
+          // Update individual test case executions based on JSON results
+          try {
+            const jsonOutput = JSON.parse(result.output);
+            if (jsonOutput.suites && executions.length > 0) {
+              for (const execution of executions) {
+                let testCaseSuccess = result.success; // Default to overall result
+                let testCaseDuration = result.executionTime;
+                let testCaseError = result.errorOutput || null;
+
+                // Try to find specific test case result in JSON output
+                for (const suite of jsonOutput.suites) {
+                  for (const spec of suite.specs) {
+                    // Match by test case name
+                    if (spec.title === execution.testCase.name) {
+                      testCaseSuccess = spec.ok;
+                      if (spec.tests && spec.tests.length > 0 && spec.tests[0].results && spec.tests[0].results.length > 0) {
+                        const testResult = spec.tests[0].results[0];
+                        testCaseDuration = testResult.duration || result.executionTime;
+                        testCaseError = testResult.errors && testResult.errors.length > 0 
+                          ? testResult.errors.map((e: any) => e.message).join('; ')
+                          : null;
+                      }
+                      break;
+                    }
                   }
                 }
+
+                // Update the test case execution
+                await prisma.testCaseExecution.update({
+                  where: { id: execution.id },
+                  data: {
+                    status: testCaseSuccess ? 'passed' : 'failed',
+                    duration: testCaseDuration,
+                    output: result.output,
+                    errorMessage: testCaseError,
+                    endTime: new Date()
+                  }
+                });
               }
-            },
+            } else {
+              // Fallback: update all test case executions with the overall result
+              await prisma.testCaseExecution.updateMany({
+                where: { testResultId: testResult.id },
+                data: {
+                  status: result.success ? 'passed' : 'failed',
+                  duration: result.executionTime,
+                  output: result.output,
+                  errorMessage: result.errorOutput || null,
+                  endTime: new Date()
+                }
+              });
+            }
+          } catch (jsonError) {
+            console.log('Could not parse JSON for individual test results, using overall result');
+            // Fallback: update all test case executions with the overall result
+            await prisma.testCaseExecution.updateMany({
+              where: { testResultId: testResult.id },
+              data: {
+                status: result.success ? 'passed' : 'failed',
+                duration: result.executionTime,
+                output: result.output,
+                errorMessage: result.errorOutput || null,
+                endTime: new Date()
+              }
+            });
+          }
+
+          // Get the final result with executions
+          const finalResult = await prisma.testResultHistory.findUnique({
+            where: { id: testResult.id },
             include: {
               testCaseExecutions: {
                 include: {
