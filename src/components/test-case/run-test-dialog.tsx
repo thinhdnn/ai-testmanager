@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { TestCaseService } from '@/lib/api/services/test-case-service';
 import { ProjectService } from '@/lib/api/services/project-service';
 import { TestCase as ApiTestCase, TestResult as ApiTestResult } from '@/lib/api/interfaces';
+import { TestResultHistory } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface ConfigurationSettings {
@@ -46,9 +47,8 @@ export interface RunTestDialogProps {
 }
 
 // Define internal component interface for TestResult that includes all needed properties
-interface TestResult {
+interface LocalTestResult {
   id: string;
-  testCaseId: string | null;
   status: string;
   success: boolean;
   executionTime: number | null;
@@ -58,6 +58,24 @@ interface TestResult {
   browser: string | null;
   videoUrl?: string | null;
   screenshot?: string | null;
+  testCaseExecutions?: Array<{
+    id: string;
+    testResultId: string;
+    testCaseId: string;
+    status: string;
+    duration?: number;
+    errorMessage?: string;
+    output?: string;
+    startTime?: string;
+    endTime?: string;
+    retries: number;
+    createdAt: string;
+    testCase: {
+      id: string;
+      name: string;
+      tags?: string;
+    };
+  }>;
   rawReport?: {
     config: {
       configFile: string;
@@ -152,12 +170,15 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
   const [testFilePath, setTestFilePath] = useState('tests/'); // Default test file path
   const [testResultId, setTestResultId] = useState<string | null>(null);
   const [isResultDialogOpen, setIsResultDialogOpen] = useState(false);
-  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [testResult, setTestResult] = useState<LocalTestResult | null>(null);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [testCaseData, setTestCaseData] = useState<TestCase | null>(null);
+  const [testCasesData, setTestCasesData] = useState<TestCase[]>([]);
   const [useReadableNames, setUseReadableNames] = useState(true);
   const [runMode, setRunMode] = useState<'background' | 'wait'>('background');
   const [activeTab, setActiveTab] = useState("logs"); // Default to logs tab
+  const [isRunning, setIsRunning] = useState(false); // New state for running status
+  const [testRunName, setTestRunName] = useState(''); // New state for test run name
   const testCaseService = new TestCaseService();
   const projectService = new ProjectService();
   
@@ -195,6 +216,27 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
       loadTestCaseData();
     }
   }, [isOpen, projectId, testCaseId, mode]);
+  
+  // Load test cases data if we have testCaseIds
+  useEffect(() => {
+    async function loadTestCasesData() {
+      if (mode === 'list' && testCaseIds && testCaseIds.length > 0) {
+        try {
+          const cases = await Promise.all(
+            testCaseIds.map(id => testCaseService.getTestCase(projectId, id))
+          );
+          setTestCasesData(cases as TestCase[]);
+        } catch (error) {
+          console.error('Error loading test cases data:', error);
+          toast.error('Failed to load test cases data');
+        }
+      }
+    }
+    
+    if (isOpen) {
+      loadTestCasesData();
+    }
+  }, [isOpen, projectId, testCaseIds, mode]);
   
   useEffect(() => {
     async function loadConfig() {
@@ -355,9 +397,8 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
           }
 
           // Convert API result to component's TestResult format
-          const result: TestResult = {
+          const result: LocalTestResult = {
             id: apiResult.id,
-            testCaseId: apiResult.testCaseId || null,
             status: apiResult.status,
             success: apiResult.success,
             executionTime: apiResult.executionTime || executionTime,
@@ -366,7 +407,8 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
             output: apiResult.output || null,
             browser: apiResult.browser || null,
             videoUrl: apiResult.videoUrl,
-            screenshot: apiResult.screenshot
+            screenshot: apiResult.screenshot,
+            // testCaseExecutions: apiResult.testCaseExecutions || []
           };
           
           setTestResult(result);
@@ -416,21 +458,18 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
       console.log('API Result from test-result endpoint:', apiResult);
       
       // Convert API result to component's TestResult format
-      const result: TestResult = {
+      const result: LocalTestResult = {
         id: apiResult.id,
-        testCaseId: apiResult.testCaseId || null,
         status: apiResult.status,
         success: apiResult.success,
         executionTime: apiResult.executionTime || null,
         createdAt: new Date(apiResult.createdAt),
-        // Use errorMessage field directly if available, or fall back to error
         errorMessage: apiResult.errorMessage || apiResult.error || null,
-        // Use properly typed fields now that they're defined in the interface
         output: apiResult.output || null,
         browser: apiResult.browser || null,
-        // Map videoUrl to video for internal component use
         videoUrl: apiResult.videoUrl,
-        screenshot: apiResult.screenshot
+        screenshot: apiResult.screenshot,
+        // testCaseExecutions: apiResult.testCaseExecutions || []
       };
       
       // Debug log to see the result object we're setting
@@ -480,10 +519,15 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
     
     // Add the appropriate file pattern based on mode
     if (mode === 'file' && testCaseId) {
-      baseCommand += ` ${testFilePath}`;
-    } else if (mode === 'list' && testCaseIds?.length) {
-      // For list mode, use the testFilePath as is
-      baseCommand += ` ${testFilePath}`;
+      // For single test case, use its testFilePath
+      const filePath = testCaseData?.testFilePath || testFilePath;
+      baseCommand += ` ${filePath}`;
+    } else if (mode === 'list' && testCasesData.length > 0) {
+      // For list mode, use testFilePath from each test case
+      const testFiles = testCasesData
+        .map(testCase => testCase.testFilePath || `${testFilePath}${testCase.id}.ts`)
+        .join(' ');
+      baseCommand += ` ${testFiles}`;
     } else if (mode === 'project') {
       // For project mode, use the testFilePath as is
       baseCommand += ` ${testFilePath}`;
@@ -528,7 +572,15 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
   
   async function handleRunTest() {
     try {
-      toast.loading('Running tests...');
+      if (runMode === 'wait') {
+        // For wait mode, close dialog immediately and show running state
+        setIsRunning(true);
+        onClose();
+        setIsResultDialogOpen(true);
+        toast.loading('Running tests...');
+      } else {
+        toast.loading('Running tests...');
+      }
       
       const data = await testCaseService.runTest(projectId, {
         command,
@@ -540,7 +592,8 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
         config,
         testFilePath,
         useReadableNames,
-        waitForResult: runMode === 'wait'
+        waitForResult: runMode === 'wait',
+        testRunName: testRunName.trim() || undefined
       });
 
       if (runMode === 'wait') {
@@ -567,10 +620,11 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
           rawReport: parsedReport
         } : null);
         
+        setIsRunning(false);
         toast.dismiss();
         toast.success('Test completed');
-        onClose();
-        setIsResultDialogOpen(true);
+        // Don't call onClose() here since dialog is already closed
+        // setIsResultDialogOpen(true) is already called above
       } else {
         setTestResultId(data.testResultId);
         toast.dismiss();
@@ -579,6 +633,7 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
         setIsResultDialogOpen(true);
       }
     } catch (error) {
+      setIsRunning(false);
       toast.dismiss();
       console.error('Error running test:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to run test');
@@ -683,7 +738,19 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
               </div>
             </div>
             
-
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="testRunName" className="text-right">
+                Run Name
+              </Label>
+              <div className="col-span-3">
+                <Input
+                  id="testRunName"
+                  value={testRunName}
+                  onChange={(e) => setTestRunName(e.target.value)}
+                  placeholder="Optional name for this test run"
+                />
+              </div>
+            </div>
             
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="command" className="text-right">
@@ -751,110 +818,158 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
       <Dialog open={isResultDialogOpen} onOpenChange={setIsResultDialogOpen}>
         <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Test Results</DialogTitle>
+            <DialogTitle>
+              {isRunning ? 'Running Tests...' : 'Test Results'}
+            </DialogTitle>
             <DialogDescription>
-              Test completed
+              {isRunning ? 'Please wait while tests are running' : 'Test completed'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Test Status Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {testResult?.success ? (
-                  <CheckCircle className="text-green-500 h-5 w-5" />
-                ) : (
-                  <XCircle className="text-red-500 h-5 w-5" />
-                )}
-                <h3 className="text-lg font-medium">
-                  Test {testResult?.success ? 'Passed' : 'Failed'}
-                </h3>
+          {isRunning ? (
+            // Running state
+            <div className="space-y-4 py-8">
+              <div className="flex items-center justify-center gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <div className="text-center">
+                  <h3 className="text-lg font-medium">Running Tests</h3>
+                  <p className="text-muted-foreground">
+                    Please wait while your tests are executing...
+                  </p>
+                </div>
               </div>
-              <Badge variant="default" className="bg-red-500">
-                completed
-              </Badge>
+              
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  Browser: {browser} • Mode: {headless ? 'Headless' : 'Headed'}
+                </p>
+              </div>
             </div>
+          ) : (
+            // Results state (existing content)
+            <div className="space-y-4">
+              {/* Test Status Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {testResult?.success ? (
+                    <CheckCircle className="text-green-500 h-5 w-5" />
+                  ) : (
+                    <XCircle className="text-red-500 h-5 w-5" />
+                  )}
+                  <h3 className="text-lg font-medium">
+                    Test {testResult?.success ? 'Passed' : 'Failed'}
+                  </h3>
+                </div>
+                <Badge variant="default" className="bg-red-500">
+                  completed
+                </Badge>
+              </div>
 
-            {/* Test Info */}
-            <div className="text-sm text-muted-foreground">
-              Browser: {testResult?.browser || 'chromium'} • 
-              Duration: {testResult?.executionTime ? (testResult.executionTime / 1000).toFixed(2) : '0'}s • 
-              Created {testResult?.createdAt ? formatDistance(new Date(testResult.createdAt), new Date(), { addSuffix: true }) : ''}
-            </div>
+              {/* Test Info */}
+              <div className="text-sm text-muted-foreground">
+                Browser: {testResult?.browser || 'chromium'} • 
+                Duration: {testResult?.executionTime ? (testResult.executionTime / 1000).toFixed(2) : '0'}s • 
+                Created {testResult?.createdAt ? formatDistance(new Date(testResult.createdAt), new Date(), { addSuffix: true }) : ''}
+              </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue="results" className="w-full">
-              <TabsList>
-                <TabsTrigger value="results" className="flex items-center gap-2">
-                  <Terminal className="h-4 w-4" />
-                  Results & Media
-                </TabsTrigger>
-                <TabsTrigger value="logs" className="flex items-center gap-2">
-                  <Terminal className="h-4 w-4" />
-                  Logs
-                </TabsTrigger>
-              </TabsList>
+              {/* Tabs */}
+              <Tabs defaultValue="results" className="w-full">
+                <TabsList>
+                  <TabsTrigger value="results" className="flex items-center gap-2">
+                    <Terminal className="h-4 w-4" />
+                    Results & Media
+                  </TabsTrigger>
+                  <TabsTrigger value="logs" className="flex items-center gap-2">
+                    <Terminal className="h-4 w-4" />
+                    Logs
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="results" className="mt-4">
-                <div className="rounded-md border">
-                  <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50 border-b text-sm font-medium">
-                    <div className="col-span-6">Test Case</div>
-                    <div className="col-span-3 text-right">Duration</div>
-                    <div className="col-span-3">Status</div>
-                  </div>
-                  {testResult?.rawReport ? (
-                    testResult.rawReport.suites.map((suite, suiteIndex) => (
-                      <React.Fragment key={suiteIndex}>
-                        {suite.specs.map((spec, specIndex) => (
-                          <div key={`${suiteIndex}-${specIndex}`} className="grid grid-cols-12 gap-4 p-4 border-b last:border-0 text-sm items-center hover:bg-slate-50">
+                <TabsContent value="results" className="mt-4">
+                  <div className="rounded-md border">
+                    <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50 border-b text-sm font-medium">
+                      <div className="col-span-6">Test Case</div>
+                      <div className="col-span-3 text-right">Duration</div>
+                      <div className="col-span-3">Status</div>
+                    </div>
+                    {testResult?.testCaseExecutions && testResult.testCaseExecutions.length > 0 ? (
+                      testResult.testCaseExecutions.map((testCaseExecution, index) => {
+                        return (
+                          <div key={index} className="grid grid-cols-12 gap-4 p-4 border-b last:border-0 text-sm items-center hover:bg-slate-50">
                             <div className="col-span-6 font-medium">
-                              {spec.title}
+                              {testCaseExecution.testCase.name}
                             </div>
                             <div className="col-span-3 text-right text-muted-foreground">
-                              {spec.tests[0]?.results[0]?.duration ? 
-                                `${(spec.tests[0].results[0].duration / 1000).toFixed(2)}s` : 
+                              {testCaseExecution.duration ? 
+                                `${(testCaseExecution.duration / 1000).toFixed(2)}s` : 
                                 'N/A'
                               }
                             </div>
                             <div className="col-span-3">
                               <Badge 
-                                variant={spec.ok ? "default" : "destructive"}
+                                variant={testCaseExecution.status === 'passed' ? "default" : "destructive"}
                                 className="capitalize"
                               >
-                                {spec.ok ? "Passed" : "Failed"}
+                                {testCaseExecution.status.charAt(0).toUpperCase() + testCaseExecution.status.slice(1)}
                               </Badge>
                             </div>
                           </div>
-                        ))}
-                      </React.Fragment>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-muted-foreground">
-                      No test results available
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
+                        );
+                      })
+                    ) : testResult?.rawReport ? (
+                      testResult.rawReport.suites.map((suite, suiteIndex) => (
+                        <React.Fragment key={suiteIndex}>
+                          {suite.specs.map((spec, specIndex) => (
+                            <div key={`${suiteIndex}-${specIndex}`} className="grid grid-cols-12 gap-4 p-4 border-b last:border-0 text-sm items-center hover:bg-slate-50">
+                              <div className="col-span-6 font-medium">
+                                {spec.title}
+                              </div>
+                              <div className="col-span-3 text-right text-muted-foreground">
+                                {spec.tests[0]?.results[0]?.duration ? 
+                                  `${(spec.tests[0].results[0].duration / 1000).toFixed(2)}s` : 
+                                  'N/A'
+                                }
+                              </div>
+                              <div className="col-span-3">
+                                <Badge 
+                                  variant={spec.ok ? "default" : "destructive"}
+                                  className="capitalize"
+                                >
+                                  {spec.ok ? "Passed" : "Failed"}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-muted-foreground">
+                        No test results available
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
 
-              <TabsContent value="logs" className="mt-4">
-                <div className="rounded-md border bg-slate-50 p-4">
-                  <pre className="text-sm font-mono whitespace-pre-wrap overflow-auto max-h-[500px]">
-                    {testResult?.output || 'No logs available'}
-                  </pre>
-                </div>
-              </TabsContent>
-            </Tabs>
+                <TabsContent value="logs" className="mt-4">
+                  <div className="rounded-md border bg-slate-50 p-4">
+                    <pre className="text-sm font-mono whitespace-pre-wrap overflow-auto max-h-[500px]">
+                      {testResult?.output || 'No logs available'}
+                    </pre>
+                  </div>
+                </TabsContent>
+              </Tabs>
 
-            {/* Footer */}
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setIsResultDialogOpen(false)}>
-                Close
-              </Button>
-              <Button onClick={() => setActiveTab('logs')} variant="default">
-                View Logs
-              </Button>
+              {/* Footer */}
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setIsResultDialogOpen(false)}>
+                  Close
+                </Button>
+                <Button onClick={() => setActiveTab('logs')} variant="default">
+                  View Logs
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

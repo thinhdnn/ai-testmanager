@@ -9,15 +9,21 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '10', 10);
     
-    // Get recent test results with related test case and project
+    // Get recent test results with related project and test case executions
     const recentResults = await prisma.testResultHistory.findMany({
       orderBy: {
         createdAt: 'desc'
       },
       include: {
-        testCase: {
+        project: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        testCaseExecutions: {
           include: {
-            project: {
+            testCase: {
               select: {
                 id: true,
                 name: true

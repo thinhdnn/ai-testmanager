@@ -107,7 +107,6 @@ export interface StepVersion {
 
 export interface TestResult {
   id: string;
-  testCaseId: string;
   projectId: string;
   status: string;
   success: boolean;
@@ -121,6 +120,12 @@ export interface TestResult {
   browser?: string;
   createdAt: string;
   createdBy: string;
+  testCases?: Array<{
+    testCase: {
+      id: string;
+      name: string;
+    };
+  }>;
 }
 
 export interface DashboardStats {

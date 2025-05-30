@@ -29,7 +29,7 @@ export class TestCaseRepository {
     return prisma.testCase.findUnique({
       where: { id },
       include: {
-        Steps: {
+        steps: {
           orderBy: { order: 'asc' }
         }
       }
@@ -62,11 +62,11 @@ export class TestCaseRepository {
         project: true,
         _count: {
           select: {
-            Steps: true
+            steps: true
           }
         },
         ...(options?.includeSteps ? { 
-          Steps: {
+          steps: {
             orderBy: { order: 'asc' }
           } 
         } : {})
@@ -189,7 +189,7 @@ export async function getTestCases(projectId: string, options: {
       include: {
         _count: {
           select: {
-            Steps: true,
+            steps: true,
           },
         },
       },

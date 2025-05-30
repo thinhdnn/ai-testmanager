@@ -16,9 +16,9 @@ export interface TestCase {
   createdBy?: string;
   updatedBy?: string;
   lastRun?: string | Date | null;
-  Steps?: TestCaseStep[];
+  steps?: TestCaseStep[];
   _count?: {
-    Steps: number;
+    steps: number;
   };
 }
 
@@ -70,7 +70,6 @@ export interface StepVersion {
 export interface TestResult {
   id: string;
   projectId?: string;
-  testCaseId: string;
   status: string;
   success: boolean;
   executionTime: number | null;
@@ -84,6 +83,12 @@ export interface TestResult {
   resultData?: string | null;
   browser?: string | null;
   videoUrl?: string | null;
+  testCases?: Array<{
+    testCase: {
+      id: string;
+      name: string;
+    };
+  }>;
 }
 
 export interface TestCaseFormValues {

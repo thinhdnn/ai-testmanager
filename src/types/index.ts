@@ -21,7 +21,6 @@ export interface CreateProjectResponse {
 export interface TestResult {
   id: string;
   projectId: string;
-  testCaseId: string | null;
   success: boolean;
   status: string;
   executionTime: number | null;
@@ -32,6 +31,48 @@ export interface TestResult {
   browser: string | null;
   videoUrl: string | null;
   screenshot?: string | null;
+  testCases?: Array<{
+    testCase: {
+      id: string;
+      name: string;
+    };
+  }>;
+}
+
+export interface TestCaseExecution {
+  id: string;
+  testResultId: string;
+  testCaseId: string;
+  status: string;
+  duration?: number;
+  errorMessage?: string;
+  output?: string;
+  startTime?: string;
+  endTime?: string;
+  retries: number;
+  createdAt: string;
+  testCase: {
+    id: string;
+    name: string;
+    tags?: string;
+  };
+}
+
+export interface TestResultHistory {
+  id: string;
+  projectId: string;
+  success: boolean;
+  status: string;
+  executionTime?: number;
+  output?: string;
+  errorMessage?: string;
+  resultData?: string;
+  createdAt: string;
+  createdBy?: string;
+  lastRunBy?: string;
+  browser?: string;
+  videoUrl?: string;
+  testCaseExecutions: TestCaseExecution[];
 }
 
 export interface FixturePageProps {

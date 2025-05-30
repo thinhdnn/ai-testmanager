@@ -76,7 +76,7 @@ interface TestCase {
   updatedAt: string;
   lastRun?: string | null;
   _count?: {
-    Steps: number;
+    steps: number;
   };
 }
 
@@ -95,6 +95,7 @@ interface TestCaseTableProps {
     tags: string[];
   };
   onRunSelected?: (testCaseIds: string[]) => void;
+  onTestCaseDeleted?: (deletedTestCaseId: string) => void;
 }
 
 export function TestCaseTable({ 
@@ -102,7 +103,8 @@ export function TestCaseTable({
   projectId, 
   pagination, 
   filters,
-  onRunSelected 
+  onRunSelected,
+  onTestCaseDeleted
 }: TestCaseTableProps) {
   const router = useRouter();
   
@@ -343,6 +345,10 @@ export function TestCaseTable({
       // Also update the router state to keep UI and URL in sync, but the UI will
       // update immediately thanks to our state update
       router.refresh();
+      
+      if (onTestCaseDeleted) {
+        onTestCaseDeleted(testCaseToDelete.id);
+      }
     } catch (error) {
       console.error('Error deleting test case:', error);
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred');

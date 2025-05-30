@@ -1,13 +1,13 @@
 import { notFound, redirect } from 'next/navigation';
 import { Metadata } from 'next';
-import { ProjectService } from '@/lib/api/services';
+import { ProjectRepository } from '@/lib/db/repositories/project-repository';
 import { Project, FixturePageProps } from '@/types';
 
-// Fetch project using ProjectService
+// Fetch project using ProjectRepository directly in server-side
 async function fetchProject(projectId: string): Promise<Project | null> {
   try {
-    const projectService = new ProjectService();
-    return await projectService.getProject(projectId);
+    const projectRepository = new ProjectRepository();
+    return await projectRepository.findById(projectId);
   } catch (error) {
     console.error('Error fetching project:', error);
     return null;

@@ -145,7 +145,7 @@ export async function POST(
           updatedBy: userEmail,
         },
         include: {
-          Steps: {
+          steps: {
             orderBy: {
               order: 'asc',
             },

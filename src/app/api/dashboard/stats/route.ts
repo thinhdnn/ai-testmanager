@@ -1,147 +1,144 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { getCurrentUserEmail } from '@/lib/auth/session';
+import { Prisma } from '@prisma/client';
 
-// Define types for the data structures
-interface TagStat {
-  count: number;
-  passed: number;
-  total: number;
-}
-
-interface DailyStat {
+interface ExecutionStats {
   passed: number;
   failed: number;
-  total: number;
+  skipped: number;
 }
 
-// GET /api/dashboard/stats
+type TestCaseExecution = {
+  id: string;
+  testResultId: string;
+  testCaseId: string;
+  status: string;
+  duration: number | null;
+  errorMessage: string | null;
+  output: string | null;
+  startTime: Date | null;
+  endTime: Date | null;
+  retries: number;
+  createdAt: Date;
+};
+
+type TestResultWithExecutions = {
+  id: string;
+  projectId: string;
+  success: boolean;
+  status: string;
+  executionTime: number | null;
+  output: string | null;
+  errorMessage: string | null;
+  resultData: string | null;
+  createdAt: Date;
+  createdBy: string | null;
+  lastRunBy: string | null;
+  browser: string | null;
+  videoUrl: string | null;
+  testCaseExecutions: TestCaseExecution[];
+};
+
 export async function GET(request: NextRequest) {
   try {
-    const userEmail = await getCurrentUserEmail();
-    
-    // Get counts for key metrics
-    const totalTestCases = await prisma.testCase.count();
-    const totalProjects = await prisma.project.count();
-    const totalExecutions = await prisma.testResultHistory.count();
-    
-    // Get successful runs count for pass rate calculation
-    const successfulRuns = await prisma.testResultHistory.count({
-      where: {
-        success: true
-      }
+    const searchParams = request.nextUrl.searchParams;
+    const projectId = searchParams.get('projectId');
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+
+    // Get total test cases
+    const totalTestCases = await prisma.testCase.count({
+      where: projectId ? { projectId } : undefined
     });
-    
-    // Calculate pass rate (default to 0 if no test runs)
-    const passRate = totalExecutions > 0 ? successfulRuns / totalExecutions : 0;
-    
-    // Get tag statistics
+
+    // Get test cases by status
+    const testCasesByStatus = await prisma.testCase.groupBy({
+      by: ['status'],
+      where: projectId ? { projectId } : undefined,
+      _count: true
+    });
+
+    // Get test cases by tag
     const testCasesWithTags = await prisma.testCase.findMany({
-      where: {
-        tags: {
-          not: null
-        }
-      },
+      where: projectId ? { projectId } : undefined,
       select: {
         id: true,
-        tags: true,
-        testResults: {
-          select: {
-            success: true
-          }
-        }
+        tags: true
       }
     });
-    
-    // Process tags
-    const tagMap = new Map<string, TagStat>();
-    testCasesWithTags.forEach(testCase => {
+
+    const tagStats = testCasesWithTags.reduce((acc: { [key: string]: number }, testCase) => {
       if (testCase.tags) {
-        const tags = testCase.tags.split(',').map(tag => tag.trim());
+        const tags = testCase.tags.split(',');
         tags.forEach(tag => {
-          if (!tagMap.has(tag)) {
-            tagMap.set(tag, { count: 0, passed: 0, total: 0 });
-          }
-          
-          const tagStat = tagMap.get(tag)!;
-          tagStat.count++;
-          
-          // Calculate success rate for this tag
-          if (testCase.testResults.length > 0) {
-            const successfulRuns = testCase.testResults.filter(result => result.success).length;
-            tagStat.passed += successfulRuns;
-            tagStat.total += testCase.testResults.length;
-          }
+          const trimmedTag = tag.trim();
+          acc[trimmedTag] = (acc[trimmedTag] || 0) + 1;
         });
       }
-    });
-    
-    // Convert tag map to array for the response
-    const tagStats = Array.from(tagMap.entries()).map(([tag, stats]) => ({
-      tag,
-      count: stats.count,
-      passRate: stats.total > 0 ? stats.passed / stats.total : 0
-    }));
-    
-    // Sort tags by count (most popular first)
-    tagStats.sort((a, b) => b.count - a.count);
-    
-    // Get trend data for last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const recentResults = await prisma.testResultHistory.findMany({
+      return acc;
+    }, {});
+
+    // Get test execution trends
+    const testResults = await prisma.testResultHistory.findMany({
       where: {
+        projectId: projectId || undefined,
         createdAt: {
-          gte: thirtyDaysAgo
+          gte: dateFrom ? new Date(dateFrom) : undefined,
+          lte: dateTo ? new Date(dateTo) : undefined
         }
       },
       orderBy: {
         createdAt: 'asc'
       }
     });
-    
-    // Group by day
-    const resultsByDay: Record<string, DailyStat> = {};
-    
-    recentResults.forEach(result => {
+
+    const executionTrends = testResults.reduce((acc: { [key: string]: ExecutionStats }, result) => {
       const date = result.createdAt.toISOString().split('T')[0];
-      
-      if (!resultsByDay[date]) {
-        resultsByDay[date] = { passed: 0, failed: 0, total: 0 };
+      if (!acc[date]) {
+        acc[date] = {
+          passed: 0,
+          failed: 0,
+          skipped: 0
+        };
       }
-      
-      resultsByDay[date].total++;
-      
-      if (result.success) {
-        resultsByDay[date].passed++;
-      } else {
-        resultsByDay[date].failed++;
+
+      return acc;
+    }, {});
+
+    // Get test case executions for each result
+    const testCaseExecutions = await prisma.$queryRawUnsafe<TestCaseExecution[]>(
+      `SELECT id, "testResultId", "testCaseId", status, duration, "errorMessage", output, "startTime", "endTime", retries, "createdAt" FROM "TestCaseExecution" WHERE "testResultId" IN (${testResults.map(result => `'${result.id}'`).join(',')})`
+    );
+
+    // Group executions by test result date
+    testCaseExecutions.forEach((execution: TestCaseExecution) => {
+      const result = testResults.find(r => r.id === execution.testResultId);
+      if (result) {
+        const date = result.createdAt.toISOString().split('T')[0];
+        if (execution.status === 'passed') executionTrends[date].passed++;
+        else if (execution.status === 'failed') executionTrends[date].failed++;
+        else executionTrends[date].skipped++;
       }
     });
-    
-    // Convert to array for the response
-    const trendData = Object.entries(resultsByDay).map(([date, stats]) => ({
+
+    // Format trends for response
+    const trends = Object.entries(executionTrends).map(([date, stats]) => ({
       date,
       passed: stats.passed,
       failed: stats.failed,
-      total: stats.total,
-      passRate: stats.total > 0 ? stats.passed / stats.total : 0
+      skipped: stats.skipped
     }));
-    
-    // Return comprehensive dashboard stats
+
     return NextResponse.json({
       totalTestCases,
-      totalProjects,
-      totalExecutions,
-      passRate,
+      testCasesByStatus,
       tagStats,
-      trends: trendData
+      trends
     });
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch dashboard statistics' },
+      { error: 'Failed to fetch dashboard stats' },
       { status: 500 }
     );
   }

@@ -29,7 +29,15 @@ type ProjectFindOptions = {
   relations?: {
     testCases?: boolean;
     fixtures?: boolean;
-    testResults?: boolean;
+    testResults?: {
+      include?: {
+        testCaseExecutions?: {
+          include?: {
+            testCase?: boolean;
+          };
+        };
+      };
+    };
   };
 };
 
@@ -54,7 +62,15 @@ export class ProjectRepository {
       include: {
         testCases: options.relations?.testCases || false,
         fixtures: options.relations?.fixtures || false,
-        testResults: options.relations?.testResults || false,
+        testResults: options.relations?.testResults ? {
+          include: {
+            testCaseExecutions: {
+              include: {
+                testCase: true
+              }
+            }
+          }
+        } : false,
       },
     });
     

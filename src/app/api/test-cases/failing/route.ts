@@ -9,12 +9,14 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '5', 10);
     
-    // Get test cases with their results
+    // Get test cases with their executions that have failures
     const testCases = await prisma.testCase.findMany({
       where: {
-        testResults: {
+        executions: {
           some: {
-            success: false
+            status: {
+              not: "passed"
+            }
           }
         }
       },
@@ -24,11 +26,11 @@ export async function GET(request: NextRequest) {
             name: true
           }
         },
-        testResults: {
+        executions: {
           orderBy: {
             createdAt: 'desc'
           },
-          take: 10 // Get last 10 results to calculate failure rate
+          take: 10 // Get last 10 executions to calculate failure rate
         }
       },
       take: limit
@@ -36,8 +38,8 @@ export async function GET(request: NextRequest) {
 
     // Calculate failure rate for each test case
     const failingTests = testCases.map(testCase => {
-      const totalRuns = testCase.testResults.length;
-      const failures = testCase.testResults.filter(result => !result.success).length;
+      const totalRuns = testCase.executions.length;
+      const failures = testCase.executions.filter(execution => execution.status !== "passed").length;
       const failureRate = totalRuns > 0 ? failures / totalRuns : 0;
       
       return {

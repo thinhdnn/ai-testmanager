@@ -5,13 +5,48 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDate } from '@/lib/utils/date';
 import { formatDistance } from 'date-fns';
-import { TestResult } from '@/types';
-import { CheckCircle, XCircle, Terminal } from 'lucide-react';
+import { CheckCircle, XCircle, Terminal, Clock, AlertCircle } from 'lucide-react';
+
+interface TestCaseExecution {
+  id: string;
+  testResultId: string;
+  testCaseId: string;
+  status: string;
+  duration?: number;
+  errorMessage?: string;
+  output?: string;
+  startTime?: string;
+  endTime?: string;
+  retries: number;
+  createdAt: string;
+  testCase: {
+    id: string;
+    name: string;
+    tags?: string;
+  };
+}
+
+interface TestResultHistory {
+  id: string;
+  projectId: string;
+  success: boolean;
+  status: string;
+  executionTime?: number;
+  output?: string;
+  errorMessage?: string;
+  resultData?: string;
+  createdAt: string;
+  createdBy?: string;
+  lastRunBy?: string;
+  browser?: string;
+  videoUrl?: string;
+  testCaseExecutions: TestCaseExecution[];
+}
 
 interface TestResultDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  testResult: TestResult | null;
+  testResult: TestResultHistory | null;
 }
 
 export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDialogProps) {
@@ -27,18 +62,24 @@ export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDial
     }
   }
 
+  // Calculate overall statistics
+  const totalExecutions = testResult.testCaseExecutions.length;
+  const passedExecutions = testResult.testCaseExecutions.filter(exec => exec.status === 'passed').length;
+  const failedExecutions = testResult.testCaseExecutions.filter(exec => exec.status === 'failed').length;
+  const totalDuration = testResult.testCaseExecutions.reduce((sum, exec) => sum + (exec.duration || 0), 0);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Test Results</DialogTitle>
+          <DialogTitle>Test Execution Results</DialogTitle>
           <DialogDescription>
-            Test completed
+            Test execution completed with {totalExecutions} test case{totalExecutions !== 1 ? 's' : ''}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Test Status Header */}
+          {/* Overall Status Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {testResult.success ? (
@@ -47,78 +88,120 @@ export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDial
                 <XCircle className="text-red-500 h-5 w-5" />
               )}
               <h3 className="text-lg font-medium">
-                Test {testResult.success ? 'Passed' : 'Failed'}
+                Test Execution {testResult.success ? 'Passed' : 'Failed'}
               </h3>
             </div>
-            <Badge variant={testResult.success ? "default" : "destructive"}>
-              {testResult.status}
-            </Badge>
+            <div className="flex gap-2">
+              <Badge variant={testResult.success ? "default" : "destructive"}>
+                {testResult.status}
+              </Badge>
+              {passedExecutions > 0 && (
+                <Badge variant="default" className="bg-green-100 text-green-800">
+                  {passedExecutions} Passed
+                </Badge>
+              )}
+              {failedExecutions > 0 && (
+                <Badge variant="destructive">
+                  {failedExecutions} Failed
+                </Badge>
+              )}
+            </div>
           </div>
 
-          {/* Test Info */}
+          {/* Execution Info */}
           <div className="text-sm text-muted-foreground">
             Browser: {testResult.browser || 'chromium'} • 
-            Duration: {testResult.executionTime ? (testResult.executionTime / 1000).toFixed(2) : '0'}s • 
+            Total Duration: {totalDuration ? (totalDuration / 1000).toFixed(2) : '0'}s • 
             Created {testResult.createdAt ? formatDistance(new Date(testResult.createdAt), new Date(), { addSuffix: true }) : ''}
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="results" className="w-full">
+          <Tabs defaultValue="executions" className="w-full">
             <TabsList>
-              <TabsTrigger value="results" className="flex items-center gap-2">
+              <TabsTrigger value="executions" className="flex items-center gap-2">
                 <Terminal className="h-4 w-4" />
-                Results & Media
+                Test Case Executions
               </TabsTrigger>
               <TabsTrigger value="logs" className="flex items-center gap-2">
                 <Terminal className="h-4 w-4" />
-                Logs
+                Raw Output
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="results" className="mt-4">
+            <TabsContent value="executions" className="mt-4">
               <div className="space-y-4">
-                {/* Test Results Table */}
+                {/* Test Case Executions Table */}
                 <div className="rounded-md border">
                   <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50 border-b text-sm font-medium">
-                    <div className="col-span-6">Test Case</div>
-                    <div className="col-span-3 text-right">Duration</div>
-                    <div className="col-span-3">Status</div>
+                    <div className="col-span-4">Test Case</div>
+                    <div className="col-span-2">Status</div>
+                    <div className="col-span-2 text-right">Duration</div>
+                    <div className="col-span-2 text-center">Retries</div>
+                    <div className="col-span-2 text-right">Execution Time</div>
                   </div>
-                  {parsedOutput?.suites ? (
-                    parsedOutput.suites.map((suite: any, suiteIndex: number) => (
-                      <React.Fragment key={suiteIndex}>
-                        {suite.specs.map((spec: any, specIndex: number) => (
-                          <div key={`${suiteIndex}-${specIndex}`} className="grid grid-cols-12 gap-4 p-4 border-b last:border-0 text-sm items-center hover:bg-slate-50">
-                            <div className="col-span-6 font-medium">
-                              {spec.title}
+                  {testResult.testCaseExecutions.length > 0 ? (
+                    testResult.testCaseExecutions.map((execution) => (
+                      <div key={execution.id} className="grid grid-cols-12 gap-4 p-4 border-b last:border-0 text-sm items-center hover:bg-slate-50">
+                        {/* Test Case Name & Tags */}
+                        <div className="col-span-4">
+                          <div className="font-medium">{execution.testCase.name}</div>
+                          {execution.testCase.tags && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {execution.testCase.tags.split(',').map(tag => tag.trim()).join(', ')}
                             </div>
-                            <div className="col-span-3 text-right text-muted-foreground">
-                              {spec.tests?.[0]?.results?.[0]?.duration ? 
-                                `${(spec.tests[0].results[0].duration / 1000).toFixed(2)}s` : 
-                                'N/A'
-                              }
+                          )}
+                        </div>
+                        
+                        {/* Status */}
+                        <div className="col-span-2">
+                          <Badge 
+                            variant={execution.status === 'passed' ? "default" : 
+                                    execution.status === 'failed' ? "destructive" : 
+                                    "secondary"}
+                            className="capitalize"
+                          >
+                            {execution.status}
+                          </Badge>
+                        </div>
+                        
+                        {/* Duration */}
+                        <div className="col-span-2 text-right text-muted-foreground">
+                          {execution.duration ? 
+                            `${(execution.duration / 1000).toFixed(2)}s` : 
+                            'N/A'
+                          }
+                        </div>
+                        
+                        {/* Retries */}
+                        <div className="col-span-2 text-center">
+                          {execution.retries > 0 ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <AlertCircle className="h-3 w-3 text-yellow-500" />
+                              <span>{execution.retries}</span>
                             </div>
-                            <div className="col-span-3">
-                              <Badge 
-                                variant={spec.ok ? "default" : "destructive"}
-                                className="capitalize"
-                              >
-                                {spec.ok ? "Passed" : "Failed"}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                      </React.Fragment>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </div>
+                        
+                        {/* Execution Time */}
+                        <div className="col-span-2 text-right text-muted-foreground text-xs">
+                          {execution.endTime ? 
+                            formatDistance(new Date(execution.endTime), new Date(), { addSuffix: true }) : 
+                            'N/A'
+                          }
+                        </div>
+                      </div>
                     ))
                   ) : (
                     <div className="p-4 text-center text-muted-foreground">
-                      No detailed test results available
+                      No test case executions available
                     </div>
                   )}
                 </div>
 
                 {/* Media Section */}
-                {(testResult.videoUrl || testResult.screenshot) && (
+                {(testResult.videoUrl) && (
                   <div className="space-y-4">
                     {testResult.videoUrl && (
                       <div className="space-y-2">
@@ -130,16 +213,6 @@ export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDial
                         >
                           Your browser does not support the video tag.
                         </video>
-                      </div>
-                    )}
-                    {testResult.screenshot && (
-                      <div className="space-y-2">
-                        <h4 className="font-medium">Screenshot</h4>
-                        <img 
-                          src={testResult.screenshot} 
-                          alt="Test Screenshot" 
-                          className="w-full rounded-md border"
-                        />
                       </div>
                     )}
                   </div>
@@ -155,14 +228,6 @@ export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDial
               </div>
             </TabsContent>
           </Tabs>
-
-          {/* Error Message */}
-          {testResult.errorMessage && (
-            <div className="rounded-md bg-red-50 p-4 text-red-900">
-              <h4 className="font-medium mb-2">Error</h4>
-              <pre className="text-sm whitespace-pre-wrap">{testResult.errorMessage}</pre>
-            </div>
-          )}
 
           {/* Footer */}
           <div className="flex justify-end gap-2 mt-4">

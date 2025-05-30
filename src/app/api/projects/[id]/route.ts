@@ -30,7 +30,15 @@ export async function GET(
       relations: {
         testCases: true,
         fixtures: true,
-        testResults: true
+        testResults: {
+          include: {
+            testCaseExecutions: {
+              include: {
+                testCase: true
+              }
+            }
+          }
+        }
       }
     });
     

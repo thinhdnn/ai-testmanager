@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/db/prisma';
+import { Prisma } from '@prisma/client';
 
 type TestResultHistoryCreateInput = {
   projectId: string;
-  testCaseId?: string;
   success: boolean;
   status: string;
   executionTime?: number;
@@ -13,6 +13,7 @@ type TestResultHistoryCreateInput = {
   lastRunBy?: string | null;
   browser?: string;
   videoUrl?: string;
+  testCaseExecutions?: Prisma.TestCaseExecutionCreateNestedManyWithoutTestResultInput;
 };
 
 type TestResultHistoryUpdateInput = {
@@ -25,6 +26,7 @@ type TestResultHistoryUpdateInput = {
   lastRunBy?: string | null;
   browser?: string;
   videoUrl?: string;
+  testCaseExecutions?: Prisma.TestCaseExecutionUpdateManyWithoutTestResultNestedInput;
 };
 
 export class TestResultHistoryRepository {
@@ -51,8 +53,17 @@ export class TestResultHistoryRepository {
    */
   async findByTestCaseId(testCaseId: string) {
     return prisma.testResultHistory.findMany({
-      where: { testCaseId },
+      where: {
+        testCaseExecutions: {
+          some: {
+            testCaseId
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' },
+      include: {
+        testCaseExecutions: true
+      }
     });
   }
 
@@ -105,8 +116,17 @@ export class TestResultHistoryRepository {
    */
   async findLatestByTestCaseId(testCaseId: string) {
     return prisma.testResultHistory.findFirst({
-      where: { testCaseId },
+      where: {
+        testCaseExecutions: {
+          some: {
+            testCaseId
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' },
+      include: {
+        testCaseExecutions: true
+      }
     });
   }
 } 

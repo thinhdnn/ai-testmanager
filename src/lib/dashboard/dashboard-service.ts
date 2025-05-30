@@ -214,25 +214,22 @@ export class DashboardService {
       });
     });
     
-    // Now get test results for each tag's test cases
+    // Now get test executions for each tag's test cases
     const tagStats: TagStats[] = [];
     
     for (const [tagName, { count, testCaseIds }] of tagMap.entries()) {
-      // Build where clause for test results
-      const resultsWhereClause: any = {
-        testCaseId: {
-          in: testCaseIds,
+      // Get executions for test cases with this tag
+      const executions = await prisma.testCaseExecution.findMany({
+        where: {
+          testCaseId: {
+            in: testCaseIds,
+          },
+          ...(projectId && {
+            testCase: {
+              projectId: projectId
+            }
+          })
         },
-      };
-      
-      // Add project filter if specified
-      if (projectId) {
-        resultsWhereClause.projectId = projectId;
-      }
-      
-      // Get the most recent result for each test case with this tag
-      const results = await prisma.testResultHistory.findMany({
-        where: resultsWhereClause,
         orderBy: {
           createdAt: 'desc',
         },
@@ -240,8 +237,8 @@ export class DashboardService {
       });
       
       // Calculate pass rate for this tag
-      const passCount = results.filter(r => r.success).length;
-      const passRate = results.length > 0 ? passCount / results.length : 0;
+      const passCount = executions.filter(e => e.status === "passed").length;
+      const passRate = executions.length > 0 ? passCount / executions.length : 0;
       
       tagStats.push({
         name: tagName,

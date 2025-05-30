@@ -7,34 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Project model - represents a managed Playwright project
+// Project model - represents a test project
 model Project {
-  id                    String                 @id @default(uuid())
-  name                  String
-  description           String?
-  environment           String                 @default("development")
+  id                   String             @id @default(uuid())
+  name                 String
+  description         String?
+  environment         String             @default("development")
   playwrightProjectPath String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  createdBy             String?
-  updatedBy             String?
-  lastRunBy             String?
-  lastRun               DateTime?
-  testCases             TestCase[]
-  testResults           TestResultHistory[]
-  fixtures              Fixture[]
-  settings              ProjectSetting[]
-  permissions           PermissionAssignment[] @relation("ProjectPermissions")
-  @@map("projects")
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  createdBy           String?
+  updatedBy           String?
+  lastRunBy           String?
+  lastRun             DateTime?
+  testCases           TestCase[]
+  fixtures            Fixture[]
+  testResults         TestResultHistory[]
+  permissions         PermissionAssignment[] @relation("ProjectPermissions")
+  settings            ProjectSetting[]
 }
 
-// ProjectSetting model - stores Playwright configuration settings for projects
+// ProjectSetting model - stores project-specific settings
 model ProjectSetting {
   id            String    @id @default(uuid())
   projectId     String
-  category      String    // 'playwright', 'browser', 'network', etc.
-  key           String    // setting name e.g. 'browser', 'timeout', 'workers'
-  value         String    // setting value as string (can be parsed as needed)
+  category      String
+  key           String
+  value         String
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   createdBy     String?
@@ -42,32 +41,31 @@ model ProjectSetting {
   project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, category, key])
-  @@map("project_settings")
 }
 
 // TestCase model - represents a test case within a project
 model TestCase {
-  id                   String              @id @default(uuid())
-  order                Int?                 @default(0)
-  projectId            String
-  name                 String
-  status               String              @default("pending")
-  version              String              @default("1.0.0")
-  isManual             Boolean             @default(false)
-  createdAt            DateTime            @default(now())
-  lastRun              DateTime?
-  updatedAt            DateTime            @updatedAt
-  createdBy            String?
-  updatedBy            String?
-  lastRunBy            String?
-  tags                 String?
-  testFilePath         String?
-  playwrightScript String?
-  project              Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  testResults          TestResultHistory[]
-  Steps            Step[]
-  versions             TestCaseVersion[]
-  permissions          PermissionAssignment[] @relation("TestCasePermissions")
+  id                String             @id @default(uuid())
+  order             Int                @default(0)
+  projectId         String
+  name              String
+  status            String             @default("pending")
+  version           String             @default("1.0.0")
+  isManual          Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  lastRun           DateTime?
+  updatedAt         DateTime           @updatedAt
+  createdBy         String?
+  updatedBy         String?
+  lastRunBy         String?
+  tags              String?
+  testFilePath      String?
+  playwrightScript  String?
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions          TestCaseVersion[]
+  steps             Step[]
+  permissions       PermissionAssignment[] @relation("TestCasePermissions")
+  executions        TestCaseExecution[]
 }
 
 // Step model - represents a step within a test case
@@ -110,22 +108,39 @@ model Fixture {
 
 // TestResultHistory model - stores test execution logs
 model TestResultHistory {
+  id                String             @id @default(uuid())
+  projectId         String
+  name              String?            // Custom name for the test run
+  success           Boolean
+  status            String
+  executionTime     Int?
+  output            String?
+  errorMessage      String?
+  resultData        String?            // JSON string containing detailed results for each test case
+  createdAt         DateTime           @default(now())
+  createdBy         String?
+  lastRunBy         String?
+  browser           String?
+  videoUrl          String?
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  testCaseExecutions TestCaseExecution[]
+}
+
+// TestCaseExecution model - stores execution details for each test case in a test run
+model TestCaseExecution {
   id            String    @id @default(uuid())
-  projectId     String
-  testCaseId    String?
-  success       Boolean
+  testResultId  String
+  testCaseId    String
   status        String
-  executionTime Int?
-  output        String?
+  duration      Int?
   errorMessage  String?
-  resultData    String?
+  output        String?
+  startTime     DateTime?
+  endTime       DateTime?
+  retries       Int       @default(0)
   createdAt     DateTime  @default(now())
-  createdBy     String?
-  lastRunBy     String?
-  browser       String?
-  videoUrl      String?
-  testCase      TestCase? @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
-  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  testResult    TestResultHistory @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+  testCase      TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
 }
 
 // User model - for authentication and authorization

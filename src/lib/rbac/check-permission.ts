@@ -121,9 +121,9 @@ export async function checkResourcePermission(
       } else if (resource === 'testResult') {
         const testResult = await prisma.testResultHistory.findUnique({
           where: { id: resourceId },
-          select: { testCase: { select: { projectId: true } } }
+          select: { projectId: true }
         });
-        projectId = testResult?.testCase?.projectId || null;
+        projectId = testResult?.projectId || null;
       }
       
       if (projectId) {

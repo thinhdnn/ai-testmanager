@@ -42,6 +42,7 @@ import {
   TestCase,
   TestCaseVersion,
   TestResult,
+  TestResultHistory,
   StepVersion,
   TestCaseStep,
   TestCaseDetailPageProps
@@ -98,7 +99,7 @@ export default function TestCaseDetailPage() {
   const [testCase, setTestCase] = useState<TestCase | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [versions, setVersions] = useState<TestCaseVersion[]>([]);
-  const [testResults, setTestResults] = useState<TestResult[]>([]);
+  const [testResults, setTestResults] = useState<TestResultHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
@@ -110,28 +111,30 @@ export default function TestCaseDetailPage() {
   const [isRunTestDialogOpen, setIsRunTestDialogOpen] = useState(false);
   const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
   const [fileContent, setFileContent] = useState<string | null>(null);
-  const [selectedTestResult, setSelectedTestResult] = useState<TestResult | null>(null);
+  const [selectedTestResult, setSelectedTestResult] = useState<TestResultHistory | null>(null);
   const [isTestResultDialogOpen, setIsTestResultDialogOpen] = useState(false);
 
   // Khởi tạo service
   const projectService = new ProjectService();
   const testCaseService = new TestCaseService();
   
-  const convertApiTestResult = (apiResult: any): TestResult => {
+  const convertApiTestResult = (apiResult: any): TestResultHistory => {
     return {
       id: apiResult.id,
       projectId: apiResult.projectId,
-      testCaseId: apiResult.testCaseId,
-      status: apiResult.status,
       success: apiResult.success,
+      status: apiResult.status,
       executionTime: apiResult.executionTime,
+      output: apiResult.output || '',
+      errorMessage: apiResult.errorMessage || '',
+      resultData: apiResult.resultData || '',
       createdAt: apiResult.createdAt,
-      output: apiResult.output || null,
-      errorMessage: apiResult.errorMessage || null,
-      resultData: apiResult.resultData || null,
-      browser: apiResult.browser || null,
-      videoUrl: apiResult.videoUrl || null,
-    } as TestResult;
+      createdBy: apiResult.createdBy || '',
+      lastRunBy: apiResult.lastRunBy || '',
+      browser: apiResult.browser || 'chromium',
+      videoUrl: apiResult.videoUrl || '',
+      testCaseExecutions: apiResult.testCaseExecutions || []
+    } as TestResultHistory;
   };
   
   const refreshTestCaseData = async () => {
@@ -208,7 +211,7 @@ export default function TestCaseDetailPage() {
     }
   }
 
-  async function fetchTestResults(testCaseId: string): Promise<TestResult[]> {
+  async function fetchTestResults(testCaseId: string): Promise<TestResultHistory[]> {
     try {
       const apiResults = await testCaseService.getTestResults(projectId, testCaseId);
       return apiResults.map(result => convertApiTestResult(result));
@@ -476,7 +479,7 @@ export default function TestCaseDetailPage() {
         </TabsList>
         <TabsContent value="steps" className="mt-4">
           <TestStepsTable
-            steps={testCase?.Steps?.map(convertTestCaseStep) || []}
+            steps={testCase?.steps?.map(convertTestCaseStep) || []}
             testCaseId={testCaseId}
             projectId={projectId}
             onVersionUpdate={(newVersion) => {

@@ -12,6 +12,7 @@ interface RunTestRequest {
   testFilePath: string;
   useReadableNames?: boolean;
   waitForResult?: boolean;
+  testRunName?: string;
 }
 
 interface RunTestResponse {

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Edit, Trash2, ArrowLeft, PlusCircle, Play } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, PlusCircle, Play, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDistance } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +15,7 @@ import { FixtureTable } from '@/components/fixture/fixture-table';
 import { formatDate } from '@/lib/utils/date';
 import { ProjectConfigForm } from '@/components/project/project-config-form';
 import { RunTestDialog } from '@/components/test-case/run-test-dialog';
+import { TestResultDialog } from '@/components/test-case/test-result-dialog';
 
 interface Project {
   id: string;
@@ -38,6 +40,8 @@ export default function ProjectDetailPage() {
   const [isRunTestDialogOpen, setIsRunTestDialogOpen] = useState(false);
   const [selectedTestCases, setSelectedTestCases] = useState<string[]>([]);
   const [runMode, setRunMode] = useState<'list' | 'project'>('project');
+  const [selectedTestResult, setSelectedTestResult] = useState<any | null>(null);
+  const [isTestResultDialogOpen, setIsTestResultDialogOpen] = useState(false);
 
   // Load initial active tab from localStorage or URL
   useEffect(() => {
@@ -163,6 +167,18 @@ export default function ProjectDetailPage() {
   const handleRunProject = () => {
     setRunMode('project');
     setIsRunTestDialogOpen(true);
+  };
+
+  // Function to handle test case deletion and update project state
+  const handleTestCaseDeleted = (deletedTestCaseId: string) => {
+    setProject(prevProject => {
+      if (!prevProject) return prevProject;
+      
+      return {
+        ...prevProject,
+        testCases: prevProject.testCases.filter(tc => tc.id !== deletedTestCaseId)
+      };
+    });
   };
 
   if (loading) {
@@ -300,15 +316,23 @@ export default function ProjectDetailPage() {
             ) : (
               <div className="space-y-2">
                 {project.testResults?.slice(0, 5).map((result: any) => (
-                  <div key={result.id} className="flex items-center p-3 border rounded-md">
-                    <div className={`w-3 h-3 rounded-full mr-3 ${result.success ? 'bg-green-500' : 'bg-red-500'}`} />
-                    <div className="flex-1">
+                  <div key={result.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-slate-50">
+                    <div className="flex items-center gap-3">
+                      {result.success ? (
+                        <CheckCircle className="text-green-500 h-5 w-5" />
+                      ) : (
+                        <XCircle className="text-red-500 h-5 w-5" />
+                      )}
+                      <div>
                       <p className="font-medium">{result.testCase?.name || 'Unnamed Test'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(result.createdAt).toLocaleString()}
-                      </p>
+                        <div className="text-sm text-muted-foreground">
+                          Browser: {result.browser || 'chromium'} • 
+                          Duration: {result.executionTime ? (result.executionTime / 1000).toFixed(2) : '0'}s • 
+                          {formatDistance(new Date(result.createdAt), new Date(), { addSuffix: true })}
+                        </div>
+                      </div>
                     </div>
-                    <Badge variant={result.success ? 'default' : 'destructive'}>
+                    <Badge variant={result.success ? "default" : "destructive"}>
                       {result.status}
                     </Badge>
                   </div>
@@ -369,6 +393,7 @@ export default function ProjectDetailPage() {
                   tags: []
                 }}
                 onRunSelected={handleRunSelectedTests}
+                onTestCaseDeleted={handleTestCaseDeleted}
               />
             </div>
           )}
@@ -423,34 +448,61 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {project.testResults?.map((result: any) => (
-                  <div key={result.id} className="flex items-center p-4 border rounded-md">
-                    <div className={`w-4 h-4 rounded-full mr-3 ${result.success ? 'bg-green-500' : 'bg-red-500'}`} />
-                    <div className="flex-1">
-                      <p className="font-medium">{result.testCase?.name || 'Unnamed Test'}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(result.createdAt).toLocaleString()}
-                      </p>
-                      {result.errorMessage && (
-                        <p className="text-sm text-red-500 mt-1">{result.errorMessage}</p>
-                      )}
+              <div className="rounded-md border">
+                <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50 border-b text-sm font-medium">
+                  <div className="col-span-6">Test Case</div>
+                  <div className="col-span-3">Status</div>
+                  <div className="col-span-3"></div>
+                </div>
+                <div className="divide-y">
+                  {project.testResults?.map((result: any) => (
+                    <div key={result.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-slate-50">
+                      <div className="col-span-6">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${result.success ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <div>
+                            <p className="font-medium">
+                              {result.name || `Test Run #${result.id.slice(0, 8)}`}
+                              <span className="ml-2 text-sm text-muted-foreground">
+                                ({result.testCaseExecutions?.length || 0} test cases)
+                              </span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(result.createdAt)} • {result.executionTime ? (result.executionTime / 1000).toFixed(2) : '0'}s • {result.browser || 'chromium'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-span-3">
+                        <Badge variant={result.success ? 'default' : 'destructive'}>
+                          {result.status}
+                        </Badge>
+                      </div>
+                      <div className="col-span-3 text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedTestResult(result);
+                            setIsTestResultDialogOpen(true);
+                          }}
+                        >
+                          View Details
+                        </Button>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant={result.success ? 'default' : 'destructive'}>
-                        {result.status}
-                      </Badge>
-                      {result.executionTime && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {result.executionTime / 1000}s
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
+
+          {/* Test Result Dialog */}
+          <TestResultDialog
+            isOpen={isTestResultDialogOpen}
+            onClose={() => setIsTestResultDialogOpen(false)}
+            testResult={selectedTestResult}
+          />
         </TabsContent>
         
         <TabsContent value="configuration">

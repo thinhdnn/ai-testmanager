@@ -82,9 +82,6 @@ export async function POST(
       orderBy: { order: 'asc' }
     });
 
-    // Keep track of cloned fixtures to avoid duplicating the same fixture
-    const fixtureCloneMap = new Map();
-
     // Use a transaction to ensure all operations succeed or fail together
     const result = await prisma.$transaction(async (tx) => {
       // Generate a unique name for the cloned test case
@@ -107,36 +104,10 @@ export async function POST(
       // Clone all steps of the source test case
       const clonedSteps = [];
       for (const step of sourceSteps) {
-        // Handle fixture cloning if the step has a fixture
-        let fixtureId = undefined;
+        // Use the original fixture ID without cloning the fixture
+        const fixtureId = step.fixtureId;
         
-        if (step.fixtureId) {
-          // Check if we've already cloned this fixture
-          if (fixtureCloneMap.has(step.fixtureId)) {
-            fixtureId = fixtureCloneMap.get(step.fixtureId);
-          } else if (step.fixture) {
-            // Create a clone of the fixture
-            const clonedFixture = await tx.fixture.create({
-              data: {
-                projectId,
-                name: `${step.fixture.name} - Clone`,
-                type: step.fixture.type,
-                playwrightScript: step.fixture.playwrightScript,
-                filename: step.fixture.filename,
-                exportName: step.fixture.exportName,
-                fixtureFilePath: step.fixture.fixtureFilePath,
-                createdBy: userEmail || undefined,
-                updatedBy: userEmail || undefined,
-              }
-            });
-            
-            // Save the mapping for future reference
-            fixtureId = clonedFixture.id;
-            fixtureCloneMap.set(step.fixtureId, fixtureId);
-          }
-        }
-        
-        // Create the step with the cloned fixture reference
+        // Create the step with the original fixture reference
         const clonedStep = await tx.step.create({
           data: {
             testCaseId: clonedTestCase.id,

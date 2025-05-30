@@ -11,6 +11,13 @@ export class TestResultRepository {
   async create(data: Prisma.TestResultHistoryCreateInput): Promise<TestResult> {
     return prisma.testResultHistory.create({
       data,
+      include: {
+        testCaseExecutions: {
+          include: {
+            testCase: true
+          }
+        }
+      }
     });
   }
 
@@ -20,6 +27,13 @@ export class TestResultRepository {
   async findById(id: string): Promise<TestResult | null> {
     return prisma.testResultHistory.findUnique({
       where: { id },
+      include: {
+        testCaseExecutions: {
+          include: {
+            testCase: true
+          }
+        }
+      }
     });
   }
 
@@ -28,13 +42,17 @@ export class TestResultRepository {
    */
   async findByIdWithRelations(
     id: string, 
-    relations: { testCase?: boolean; stepResults?: boolean } = {}
+    relations: { testCaseExecutions?: boolean } = {}
   ): Promise<TestResult | null> {
     return prisma.testResultHistory.findUnique({
       where: { id },
       include: {
-        testCase: relations.testCase || false,
-      },
+        testCaseExecutions: relations.testCaseExecutions ? {
+          include: {
+            testCase: true
+          }
+        } : false
+      }
     });
   }
 
@@ -52,6 +70,13 @@ export class TestResultRepository {
       take: options?.take,
       orderBy: options?.orderBy,
       where: options?.where,
+      include: {
+        testCaseExecutions: {
+          include: {
+            testCase: true
+          }
+        }
+      }
     });
   }
 
@@ -62,6 +87,13 @@ export class TestResultRepository {
     return prisma.testResultHistory.update({
       where: { id },
       data,
+      include: {
+        testCaseExecutions: {
+          include: {
+            testCase: true
+          }
+        }
+      }
     });
   }
 
@@ -70,7 +102,7 @@ export class TestResultRepository {
    */
   async delete(id: string): Promise<TestResult> {
     return prisma.testResultHistory.delete({
-      where: { id },
+      where: { id }
     });
   }
 
@@ -79,7 +111,7 @@ export class TestResultRepository {
    */
   async count(where?: Prisma.TestResultHistoryWhereInput): Promise<number> {
     return prisma.testResultHistory.count({
-      where,
+      where
     });
   }
 
@@ -95,10 +127,23 @@ export class TestResultRepository {
     }
   ): Promise<TestResult[]> {
     return prisma.testResultHistory.findMany({
-      where: { testCaseId },
+      where: {
+        testCaseExecutions: {
+          some: {
+            testCaseId
+          }
+        }
+      },
       skip: options?.skip,
       take: options?.take,
       orderBy: options?.orderBy || { createdAt: 'desc' },
+      include: {
+        testCaseExecutions: {
+          include: {
+            testCase: true
+          }
+        }
+      }
     });
   }
 
@@ -107,8 +152,21 @@ export class TestResultRepository {
    */
   async findLatestByTestCaseId(testCaseId: string): Promise<TestResult | null> {
     return prisma.testResultHistory.findFirst({
-      where: { testCaseId },
+      where: {
+        testCaseExecutions: {
+          some: {
+            testCaseId
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' },
+      include: {
+        testCaseExecutions: {
+          include: {
+            testCase: true
+          }
+        }
+      }
     });
   }
 
@@ -128,7 +186,7 @@ export class TestResultRepository {
   ): Promise<TestResult[]> {
     return prisma.testResultHistory.findMany({
       where: {
-        testCase: { projectId },
+        projectId,
         status: options?.status ? options.status : undefined,
         createdAt: {
           gte: options?.dateFrom,
@@ -139,8 +197,12 @@ export class TestResultRepository {
       take: options?.take,
       orderBy: options?.orderBy || { createdAt: 'desc' },
       include: {
-        testCase: true,
-      },
+        testCaseExecutions: {
+          include: {
+            testCase: true
+          }
+        }
+      }
     });
   }
 
@@ -156,7 +218,7 @@ export class TestResultRepository {
   }> {
     const results = await prisma.testResultHistory.findMany({
       where: {
-        testCase: { projectId },
+        projectId,
         createdAt: {
           gte: dateFrom,
           lte: dateTo,

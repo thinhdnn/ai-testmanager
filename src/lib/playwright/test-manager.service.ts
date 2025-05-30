@@ -25,7 +25,7 @@ export class TestManagerService {
     const testCase = await this.prisma.testCase.findUnique({
       where: { id: testCaseId },
       include: {
-        Steps: {
+        steps: {
           orderBy: { order: 'asc' },
         },
         project: true,
@@ -101,7 +101,7 @@ export class TestManagerService {
           exportName
         };
       }),
-      steps: testCase.Steps.map(step => ({
+      steps: testCase.steps.map(step => ({
         order: step.order,
         action: step.action,
         playwrightCode: step.playwrightScript || '',

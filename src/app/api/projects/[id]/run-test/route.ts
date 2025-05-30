@@ -35,7 +35,8 @@ export async function POST(
       config, 
       testFilePath,
       useReadableNames = false,
-      waitForResult = false  // New parameter to control execution mode
+      waitForResult = false,  // New parameter to control execution mode
+      testRunName
     } = data;
 
     // Get current project
@@ -59,11 +60,45 @@ export async function POST(
     let testResult = await prisma.testResultHistory.create({
       data: {
         projectId: projectId,
-        testCaseId: mode === 'file' ? testCaseId : null,
         status: 'running',
         success: false,
         browser: browser,
+        name: testRunName || null,
+        ...(mode === 'file' && testCaseId ? {
+          testCaseExecutions: {
+            create: [{
+              testCaseId: testCaseId,
+              status: 'running'
+            }]
+          }
+        } : mode === 'list' && testCaseIds && testCaseIds.length > 0 ? {
+          testCaseExecutions: {
+            create: testCaseIds.map((id: string) => ({
+              testCaseId: id,
+              status: 'running'
+            }))
+          }
+        } : mode === 'project' ? {
+          testCaseExecutions: {
+            create: await (async () => {
+              const testCases = await prisma.testCase.findMany({
+                where: { projectId }
+              });
+              return testCases.map(tc => ({
+                testCaseId: tc.id,
+                status: 'running'
+              }));
+            })()
+          }
+        } : {})
       },
+      include: {
+        testCaseExecutions: {
+          include: {
+            testCase: true
+          }
+        }
+      }
     });
 
     // Function to execute the test and return result
@@ -155,7 +190,26 @@ export async function POST(
             success: result.success,
             output: result.output.substring(0, 10000),
             errorMessage: result.errorOutput || null,
-            executionTime: result.executionTime
+            executionTime: result.executionTime,
+            testCaseExecutions: {
+              updateMany: {
+                where: { testResultId: testResult.id },
+                data: {
+                  status: result.success ? 'passed' : 'failed',
+                  duration: result.executionTime,
+                  output: result.output,
+                  errorMessage: result.errorOutput || null,
+                  endTime: new Date()
+                }
+              }
+            }
+          },
+          include: {
+            testCaseExecutions: {
+              include: {
+                testCase: true
+              }
+            }
           }
         });
 
@@ -196,7 +250,26 @@ export async function POST(
               success: result.success,
               output: result.output.substring(0, 10000),
               errorMessage: result.errorOutput || null,
-              executionTime: result.executionTime
+              executionTime: result.executionTime,
+              testCaseExecutions: {
+                updateMany: {
+                  where: { testResultId: testResult.id },
+                  data: {
+                    status: result.success ? 'passed' : 'failed',
+                    duration: result.executionTime,
+                    output: result.output,
+                    errorMessage: result.errorOutput || null,
+                    endTime: new Date()
+                  }
+                }
+              }
+            },
+            include: {
+              testCaseExecutions: {
+                include: {
+                  testCase: true
+                }
+              }
             }
           });
 
