@@ -49,7 +49,11 @@ function SignInContent() {
       });
 
       if (result?.error) {
-        setError("Invalid username or password");
+        if (result.error === 'USER_DISABLED') {
+          setError('User has been disabled. Please contact administrator.');
+        } else {
+          setError("Invalid username or password");
+        }
         setIsLoading(false);
         return;
       }

@@ -240,11 +240,6 @@ export function UserDetail({ userId }: UserDetailProps) {
               </DialogContent>
             </Dialog>
           </div>
-          <Button className="gap-1" asChild>
-            <Link href={`/users/${user.id}/edit`}>
-              <Edit className="h-4 w-4" /> Edit
-            </Link>
-          </Button>
         </CardFooter>
       </Card>
     </>

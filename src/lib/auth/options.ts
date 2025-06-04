@@ -40,8 +40,11 @@ export const authOptions: NextAuthOptions = {
           }
         });
 
-        if (!user || !user.isActive) {
+        if (!user) {
           return null;
+        }
+        if (!user.isActive) {
+          throw new Error('USER_DISABLED');
         }
 
         const isPasswordValid = await compare(credentials.password, user.password);

@@ -69,7 +69,7 @@ export default function UsersPage() {
         take: pageSize,
         sortBy: sortField,
         sortDirection: sortDirection,
-        status: statusFilter || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
         search: searchTerm || undefined
       });
       
@@ -166,7 +166,7 @@ export default function UsersPage() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="inactive">Inactive</SelectItem>
           </SelectContent>
@@ -263,9 +263,6 @@ export default function UsersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/users/${user.id}`}>View</Link>
-                          </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link href={`/users/${user.id}/edit`}>Edit</Link>
                           </DropdownMenuItem>

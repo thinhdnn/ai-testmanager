@@ -71,7 +71,7 @@ export class UserService {
     roleIds?: string[];
     isActive?: boolean;
   }): Promise<User> {
-    return this.apiClient.patch<User>(`/users/${userId}`, user);
+    return this.apiClient.put<User>(`/users/${userId}`, user);
   }
 
   async updateUserStatus(userId: string, isActive: boolean): Promise<User> {

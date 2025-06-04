@@ -49,51 +49,16 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
       icon: <Folder className="h-5 w-5" />
     },
     {
-      name: "Test Cases",
-      href: "/test-cases",
-      icon: <ClipboardCheck className="h-5 w-5" />,
-      permission: "testcase.view"
-    },
-    {
-      name: "Executions",
-      href: "/executions",
-      icon: <PlayCircle className="h-5 w-5" />,
-      permission: "testrun.view"
-    },
-    {
-      name: "Reports",
-      href: "/reports",
-      icon: <BarChart3 className="h-5 w-5" />,
-      permission: "testrun.view"
-    },
-    {
-      name: "Fixtures",
-      href: "/fixtures",
-      icon: <Database className="h-5 w-5" />,
-      permission: "fixture.view"
-    },
-    {
-      name: "Test Runs",
-      href: "/test-runs",
-      icon: <Play className="h-5 w-5" />,
-      permission: "testrun.view"
-    },
-    {
       name: "Users",
       href: "/users",
       icon: <Users className="h-5 w-5" />,
-      permission: "user.view"
-    },
-    {
-      name: "Documentation",
-      href: "/docs",
-      icon: <BookOpen className="h-5 w-5" />
+      permission: "user.manage"
     },
     {
       name: "Settings",
       href: "/settings",
       icon: <Settings className="h-5 w-5" />,
-      permission: "settings.view"
+      permission: "system.settings"
     }
   ];
 

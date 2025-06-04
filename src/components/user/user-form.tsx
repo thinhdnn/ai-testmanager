@@ -82,7 +82,6 @@ export function UserForm({ userId, isEditing = false }: UserFormProps) {
       password: '',
       confirmPassword: '',
       roleIds: [] as string[],
-      isActive: true,
     },
   });
 
@@ -109,7 +108,6 @@ export function UserForm({ userId, isEditing = false }: UserFormProps) {
           password: '',
           confirmPassword: '',
           roleIds: userData.roles.map((r: any) => r.roleId),
-          isActive: userData.isActive,
         });
       } catch (error) {
         console.error('Error fetching user:', error);
@@ -138,7 +136,6 @@ export function UserForm({ userId, isEditing = false }: UserFormProps) {
       const payload: Record<string, any> = {
         email: values.email || null,
         roleIds: values.roleIds,
-        isActive: values.isActive,
       };
       
       // Only include password if it's been changed
@@ -163,7 +160,6 @@ export function UserForm({ userId, isEditing = false }: UserFormProps) {
           email: values.email || null,
           password: values.password,
           roleIds: values.roleIds,
-          isActive: values.isActive,
         });
         toast.success('User created successfully');
       }
@@ -317,27 +313,6 @@ export function UserForm({ userId, isEditing = false }: UserFormProps) {
                     ))}
                   </div>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="isActive"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Active</FormLabel>
-                    <FormDescription>
-                      Enable this user to allow them to log in
-                    </FormDescription>
-                  </div>
                 </FormItem>
               )}
             />

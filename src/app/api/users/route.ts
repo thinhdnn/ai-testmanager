@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     // Check if the user has permission to create users
     const session = await getServerSession(authOptions);
     
-    if (!session?.user?.permissions?.includes("user.create")) {
+    if (!session?.user?.permissions?.includes("user.manage")) {
       return NextResponse.json(
         { error: "Unauthorized: You don't have permission to create users" },
         { status: 403 }
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
     // Check if the user has permission to view users
     const session = await getServerSession(authOptions);
     
-    if (!session?.user?.permissions?.includes("user.view")) {
+    if (!session?.user?.permissions?.includes("user.manage")) {
       return NextResponse.json(
         { error: "Unauthorized: You don't have permission to view users" },
         { status: 403 }

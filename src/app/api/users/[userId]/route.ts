@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     // Check if the user has permission to read users
-    const hasPermission = await checkPermission("user", "read");
+    const hasPermission = await checkPermission("user", "manage");
     
     if (!hasPermission) {
       return NextResponse.json(
@@ -60,7 +60,7 @@ export async function PUT(
 ) {
   try {
     // Check if the user has permission to update users
-    const hasPermission = await checkPermission("user", "update");
+    const hasPermission = await checkPermission("user", "manage");
     const userEmail = await getCurrentUserEmail();
     
     if (!hasPermission) {
@@ -153,7 +153,7 @@ export async function DELETE(
 ) {
   try {
     // Check if the user has permission to delete users
-    const hasPermission = await checkPermission("user", "delete");
+    const hasPermission = await checkPermission("user", "manage");
     
     if (!hasPermission) {
       return NextResponse.json(

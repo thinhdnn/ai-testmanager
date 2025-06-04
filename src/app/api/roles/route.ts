@@ -6,7 +6,7 @@ import { checkPermission } from "@/lib/rbac/check-permission";
 export async function GET(req: NextRequest) {
   try {
     // Check if the user has permission to view roles
-    const hasPermission = await checkPermission('user', 'view');
+    const hasPermission = await checkPermission('user', 'manage');
     
     if (!hasPermission) {
       return NextResponse.json(

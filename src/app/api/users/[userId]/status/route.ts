@@ -9,7 +9,7 @@ export async function PATCH(
 ) {
   try {
     // Check if the user has permission to update users
-    const hasPermission = await checkPermission("user", "update");
+    const hasPermission = await checkPermission("user", "manage");
     const userEmail = await getCurrentUserEmail();
     
     if (!hasPermission) {
