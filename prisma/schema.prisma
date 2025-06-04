@@ -111,6 +111,7 @@ model TestResultHistory {
   id                String             @id @default(uuid())
   projectId         String
   name              String?            // Custom name for the test run
+  testResultFileName String?           // Generated filename for test results
   success           Boolean
   status            String
   executionTime     Int?

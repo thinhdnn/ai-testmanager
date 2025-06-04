@@ -21,14 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
+import { CustomPagination } from '@/components/ui/custom-pagination';
 import { 
   Card, 
   CardContent,
@@ -653,53 +646,15 @@ export function TestCaseTable({
               </Table>
               
               {totalPages > 1 && (
-                <div className="flex items-center justify-center space-x-2 mt-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                  >
-                    <span className="sr-only">Previous</span>
-                    Previous
-                  </Button>
-                  <div className="flex items-center space-x-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter(page => 
-                        page === 1 || 
-                        page === totalPages || 
-                        Math.abs(page - currentPage) <= 1
-                      )
-                      .map((page, i, arr) => (
-                        <div key={page} className="flex items-center">
-                          {i > 0 && arr[i - 1] !== page - 1 && (
-                            <span className="px-2">...</span>
-                          )}
-                          <Button
-                            variant={currentPage === page ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handlePageChange(page)}
-                            className="w-8 p-0"
-                          >
-                            {page}
-                          </Button>
-                        </div>
-                      ))
-                  }
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <span className="sr-only">Next</span>
-                    Next
-                  </Button>
-                  <div className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
-                  </div>
-                </div>
+                <CustomPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalCount={filteredAndSortedTestCases.length}
+                  pageSize={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  hasNextPage={currentPage < totalPages}
+                  hasPreviousPage={currentPage > 1}
+                />
               )}
             </div>
           )}

@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDate } from '@/lib/utils/date';
 import { formatDistance } from 'date-fns';
-import { CheckCircle, XCircle, Terminal, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Terminal, Clock, AlertCircle, Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface TestCaseExecution {
   id: string;
@@ -29,6 +30,8 @@ interface TestCaseExecution {
 interface TestResultHistory {
   id: string;
   projectId: string;
+  name?: string;
+  testResultFileName?: string;
   success: boolean;
   status: string;
   executionTime?: number;
@@ -50,6 +53,8 @@ interface TestResultDialogProps {
 }
 
 export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDialogProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
   if (!testResult) return null;
 
   // Parse output if it's a JSON string
@@ -67,6 +72,44 @@ export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDial
   const passedExecutions = testResult.testCaseExecutions.filter(exec => exec.status === 'passed').length;
   const failedExecutions = testResult.testCaseExecutions.filter(exec => exec.status === 'failed').length;
   const totalDuration = testResult.testCaseExecutions.reduce((sum, exec) => sum + (exec.duration || 0), 0);
+
+  // Download test result function
+  const handleDownloadTestResult = async () => {
+    if (!testResult.testResultFileName) {
+      toast.error('Test result file name not available');
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const response = await fetch(`/api/projects/${testResult.projectId}/test-results/${testResult.id}/download`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to download test result');
+      }
+
+      // Create blob from response
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${testResult.testResultFileName}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Test result downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading test result:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to download test result');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -112,6 +155,11 @@ export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDial
           <div className="text-sm text-muted-foreground">
             Browser: {testResult.browser || 'chromium'} • 
             Total Duration: {totalDuration ? (totalDuration / 1000).toFixed(2) : '0'}s • 
+            {testResult.testResultFileName && (
+              <>
+                Filename: {testResult.testResultFileName} • 
+              </>
+            )}
             Created {testResult.createdAt ? formatDistance(new Date(testResult.createdAt), new Date(), { addSuffix: true }) : ''}
           </div>
 
@@ -230,7 +278,24 @@ export function TestResultDialog({ isOpen, onClose, testResult }: TestResultDial
           </Tabs>
 
           {/* Footer */}
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="flex justify-between items-center gap-2 mt-4">
+            <div>
+              {testResult.testResultFileName && (
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadTestResult}
+                  disabled={isDownloading}
+                  className="flex items-center gap-2"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  {isDownloading ? 'Downloading...' : 'Download Test Results'}
+                </Button>
+              )}
+            </div>
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>

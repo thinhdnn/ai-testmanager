@@ -16,6 +16,8 @@ import { formatDate } from '@/lib/utils/date';
 import { ProjectConfigForm } from '@/components/project/project-config-form';
 import { RunTestDialog } from '@/components/test-case/run-test-dialog';
 import { TestResultDialog } from '@/components/test-case/test-result-dialog';
+import { useTestResults } from '@/lib/api/hooks/use-test-results';
+import { CustomPagination } from '@/components/ui/custom-pagination';
 
 interface Project {
   id: string;
@@ -437,72 +439,7 @@ export default function ProjectDetailPage() {
         </TabsContent>
         
         <TabsContent value="results">
-          <div className="bg-card p-6 rounded-lg border shadow-sm">
-            <h3 className="text-xl font-semibold mb-6">Test Results</h3>
-            
-            {(!project.testResults || project.testResults.length === 0) ? (
-              <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
-                <h3 className="text-xl font-medium mb-2">No test results yet</h3>
-                <p className="text-muted-foreground mb-6">
-                  Run your test cases to see results here
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50 border-b text-sm font-medium">
-                  <div className="col-span-6">Test Case</div>
-                  <div className="col-span-3">Status</div>
-                  <div className="col-span-3"></div>
-                </div>
-                <div className="divide-y">
-                  {project.testResults?.map((result: any) => (
-                    <div key={result.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-slate-50">
-                      <div className="col-span-6">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${result.success ? 'bg-green-500' : 'bg-red-500'}`} />
-                          <div>
-                            <p className="font-medium">
-                              {result.name || `Test Run #${result.id.slice(0, 8)}`}
-                              <span className="ml-2 text-sm text-muted-foreground">
-                                ({result.testCaseExecutions?.length || 0} test cases)
-                              </span>
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(result.createdAt)} • {result.executionTime ? (result.executionTime / 1000).toFixed(2) : '0'}s • {result.browser || 'chromium'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-span-3">
-                        <Badge variant={result.success ? 'default' : 'destructive'}>
-                          {result.status}
-                        </Badge>
-                      </div>
-                      <div className="col-span-3 text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedTestResult(result);
-                            setIsTestResultDialogOpen(true);
-                          }}
-                        >
-                          View Details
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Test Result Dialog */}
-          <TestResultDialog
-            isOpen={isTestResultDialogOpen}
-            onClose={() => setIsTestResultDialogOpen(false)}
-            testResult={selectedTestResult}
-          />
+          <TestResultsSection projectId={project.id} />
         </TabsContent>
         
         <TabsContent value="configuration">
@@ -535,4 +472,124 @@ function getEnvironmentVariant(environment: string): 'default' | 'secondary' | '
     default:
       return 'outline';
   }
+}
+
+// Add new component for test results with pagination
+function TestResultsSection({ projectId }: { projectId: string }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedTestResult, setSelectedTestResult] = useState<any | null>(null);
+  const [isTestResultDialogOpen, setIsTestResultDialogOpen] = useState(false);
+  
+  const { data: testResults, pagination, loading, error } = useTestResults({
+    projectId,
+    page: currentPage,
+    pageSize: 10,
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
+  });
+
+  if (loading) {
+    return (
+      <div className="bg-card p-6 rounded-lg border shadow-sm">
+        <h3 className="text-xl font-semibold mb-6">Test Results</h3>
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin h-8 w-8 border-4 border-green-500 rounded-full border-t-transparent"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-card p-6 rounded-lg border shadow-sm">
+        <h3 className="text-xl font-semibold mb-6">Test Results</h3>
+        <div className="text-center py-12 bg-destructive/10 rounded-lg border border-destructive/20">
+          <p className="text-destructive">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-card p-6 rounded-lg border shadow-sm">
+      <h3 className="text-xl font-semibold mb-6">Test Results</h3>
+      
+      {(!testResults || testResults.length === 0) ? (
+        <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
+          <h3 className="text-xl font-medium mb-2">No test results yet</h3>
+          <p className="text-muted-foreground mb-6">
+            Run your test cases to see results here
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-md border">
+            <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50 border-b text-sm font-medium">
+              <div className="col-span-6">Test Case</div>
+              <div className="col-span-3">Status</div>
+              <div className="col-span-3"></div>
+            </div>
+            <div className="divide-y">
+              {testResults.map((result: any) => (
+                <div key={result.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-slate-50">
+                  <div className="col-span-6">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${result.success ? 'bg-green-500' : 'bg-red-500'}`} />
+                      <div>
+                        <p className="font-medium">
+                          {result.name || `Test Run #${result.id.slice(0, 8)}`}
+                          <span className="ml-2 text-sm text-muted-foreground">
+                            ({result.testCaseExecutions?.length || 0} test cases)
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(result.createdAt)} • {result.executionTime ? (result.executionTime / 1000).toFixed(2) : '0'}s • {result.browser || 'chromium'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-span-3">
+                    <Badge variant={result.success ? 'default' : 'destructive'}>
+                      {result.status}
+                    </Badge>
+                  </div>
+                  <div className="col-span-3 text-right">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedTestResult(result);
+                        setIsTestResultDialogOpen(true);
+                      }}
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {pagination && (
+            <CustomPagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalCount={pagination.totalCount}
+              pageSize={pagination.pageSize}
+              onPageChange={setCurrentPage}
+              hasNextPage={pagination.hasNextPage}
+              hasPreviousPage={pagination.hasPreviousPage}
+            />
+          )}
+        </>
+      )}
+
+      {/* Test Result Dialog */}
+      <TestResultDialog
+        isOpen={isTestResultDialogOpen}
+        onClose={() => setIsTestResultDialogOpen(false)}
+        testResult={selectedTestResult}
+      />
+    </div>
+  );
 } 

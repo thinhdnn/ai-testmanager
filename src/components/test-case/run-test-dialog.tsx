@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlayCircle, Copy, Settings, CheckCircle, XCircle, Loader2, Video, Terminal } from 'lucide-react';
+import { PlayCircle, Copy, Settings, CheckCircle, XCircle, Loader2, Video, Terminal, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistance } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -179,6 +179,7 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
   const [activeTab, setActiveTab] = useState("logs"); // Default to logs tab
   const [isRunning, setIsRunning] = useState(false); // New state for running status
   const [testRunName, setTestRunName] = useState(''); // New state for test run name
+  const [isDownloading, setIsDownloading] = useState(false); // New state for downloading
   const testCaseService = new TestCaseService();
   const projectService = new ProjectService();
   
@@ -400,6 +401,44 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
       // Don't show an error toast to avoid spamming the user during polling
     }
   }
+
+  // Download test result function
+  const handleDownloadTestResult = async () => {
+    if (!testResult?.id) {
+      toast.error('Test result ID not available');
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/test-results/${testResult.id}/download`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to download test result');
+      }
+
+      // Create blob from response
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `test-results-${testResult.id}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Test result downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading test result:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to download test result');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
   
   function generateCommand() {
     let envVars = '';
@@ -860,13 +899,32 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
               </Tabs>
 
               {/* Footer */}
-              <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline" onClick={() => setIsResultDialogOpen(false)}>
-                  Close
-                </Button>
-                <Button onClick={() => setActiveTab('logs')} variant="default">
-                  View Logs
-                </Button>
+              <div className="flex justify-between items-center gap-2 mt-4">
+                <div>
+                  {testResult?.id && (
+                    <Button
+                      variant="outline"
+                      onClick={handleDownloadTestResult}
+                      disabled={isDownloading}
+                      className="flex items-center gap-2"
+                    >
+                      {isDownloading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                      {isDownloading ? 'Downloading...' : 'Download Test Results'}
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setIsResultDialogOpen(false)}>
+                    Close
+                  </Button>
+                  <Button onClick={() => setActiveTab('logs')} variant="default">
+                    View Logs
+                  </Button>
+                </div>
               </div>
             </div>
           )}

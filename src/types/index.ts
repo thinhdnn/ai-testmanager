@@ -61,6 +61,8 @@ export interface TestCaseExecution {
 export interface TestResultHistory {
   id: string;
   projectId: string;
+  name?: string;
+  testResultFileName?: string;
   success: boolean;
   status: string;
   executionTime?: number;

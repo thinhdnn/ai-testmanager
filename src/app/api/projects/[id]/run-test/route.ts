@@ -56,6 +56,12 @@ export async function POST(
     const appRoot = process.cwd();
     const absoluteProjectPath = path.join(appRoot, project.playwrightProjectPath);
 
+    // Generate test result filename
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS format
+    const testResultFileName = `test-results-${dateStr}-${timeStr}`;
+
     // Create a test result history entry first
     let testResult = await prisma.testResultHistory.create({
       data: {
@@ -63,6 +69,7 @@ export async function POST(
         status: 'running',
         success: false,
         browser: browser,
+        testResultFileName: testResultFileName,
         ...(testRunName ? { name: testRunName } : {}),
         ...(mode === 'file' && testCaseId ? {
           testCaseExecutions: {
@@ -113,10 +120,13 @@ export async function POST(
       const startTime = Date.now();
 
       try {
+        // Add TEST_RESULT_NAME to the command
+        const commandWithTestResultName = `TEST_RESULT_NAME=${testResult.testResultFileName || ''} ${command}`;
+        
         console.log(`Executing command in directory: ${absoluteProjectPath}`);
-        console.log(`Command: ${command}`);
+        console.log(`Command: ${commandWithTestResultName}`);
 
-        const childProcess = exec(command, { 
+        const childProcess = exec(commandWithTestResultName, { 
           maxBuffer: 1024 * 1024 * 10,
           cwd: absoluteProjectPath
         });
