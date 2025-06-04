@@ -226,12 +226,12 @@ export function TestCaseTable({
   // Function to render sort icon
   const renderSortIcon = (field: SortField) => {
     if (sortField !== field) {
-      return <ArrowUpDown className="ml-1 h-3 w-3 inline" />;
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/70" />;
     }
     
     return sortDirection === 'asc' 
-      ? <ArrowUp className="ml-1 h-3 w-3 inline text-primary" />
-      : <ArrowDown className="ml-1 h-3 w-3 inline text-primary" />;
+      ? <ArrowUp className="ml-2 h-4 w-4 text-primary" />
+      : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
   
   // Function to get status badge color
@@ -529,7 +529,7 @@ export function TestCaseTable({
                 <TableHeader>
                   <TableRow className="h-10 hover:bg-transparent">
                     {onRunSelected && (
-                      <TableHead className="py-2 w-10">
+                      <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 w-10 [&>[role=checkbox]]:translate-y-[2px]">
                         <Checkbox 
                           checked={selectedTestCases.length > 0 && selectedTestCases.length === filteredAndSortedTestCases.length}
                           onCheckedChange={selectAllTestCases}
@@ -537,11 +537,11 @@ export function TestCaseTable({
                         />
                       </TableHead>
                     )}
-                    <TableHead className="py-2">Name</TableHead>
-                    <TableHead className="py-2">Status</TableHead>
-                    <TableHead className="py-2">Tags</TableHead>
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Name</TableHead>
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</TableHead>
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Tags</TableHead>
                     <TableHead 
-                      className="py-2 cursor-pointer" 
+                      className="h-12 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:text-accent-foreground" 
                       onClick={() => handleSort('createdAt')}
                     >
                       <div className="flex items-center">
@@ -549,21 +549,21 @@ export function TestCaseTable({
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="py-2 cursor-pointer"
+                      className="h-12 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:text-accent-foreground"
                       onClick={() => handleSort('lastRun')}
                     >
                       <div className="flex items-center">
                         Last Run {renderSortIcon('lastRun')}
                       </div>
                     </TableHead>
-                    <TableHead className="py-2">Actions</TableHead>
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedTestCases.map((testCase) => (
-                    <TableRow key={testCase.id} className="h-10 hover:bg-muted/50">
+                    <TableRow key={testCase.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                       {onRunSelected && (
-                        <TableCell className="py-1">
+                        <TableCell className="p-4 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]">
                           <Checkbox 
                             checked={selectedTestCases.includes(testCase.id)}
                             onCheckedChange={() => toggleTestCaseSelection(testCase.id)}
@@ -571,38 +571,38 @@ export function TestCaseTable({
                           />
                         </TableCell>
                       )}
-                      <TableCell className="font-medium py-1">
+                      <TableCell className="p-4 align-middle font-medium">
                         <Link 
                           href={`/projects/${projectId}/test-cases/${testCase.id}`}
-                          className="text-primary hover:underline text-sm"
+                          className="text-black hover:underline text-sm"
                         >
                           {testCase.name}
                         </Link>
                       </TableCell>
-                      <TableCell className="py-1">
+                      <TableCell className="p-4 align-middle">
                         <Badge className={cn("text-white text-xs", getStatusColor(testCase.status))}>
                           {testCase.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="py-1">
+                      <TableCell className="p-4 align-middle">
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                           {renderTags(testCase.tags)}
                         </div>
                       </TableCell>
-                      <TableCell className="py-1 text-sm">{formatDate(testCase.createdAt)}</TableCell>
-                      <TableCell className="py-1 text-sm">
+                      <TableCell className="p-4 align-middle text-sm">{formatDate(testCase.createdAt)}</TableCell>
+                      <TableCell className="p-4 align-middle text-sm">
                         {testCase.lastRun ? formatDate(testCase.lastRun) : "Never"}
                       </TableCell>
-                      <TableCell className="py-1">
-                        <div className="flex items-center gap-1">
+                      <TableCell className="p-4 align-middle">
+                        <div className="flex items-center justify-end gap-1">
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             asChild
-                            className="h-7 w-7"
+                            className="h-8 w-8"
                           >
                             <Link href={`/projects/${projectId}/test-cases/${testCase.id}/edit`}>
-                              <Edit className="h-3.5 w-3.5" />
+                              <Edit className="h-4 w-4" />
                               <span className="sr-only">Edit</span>
                             </Link>
                           </Button>
@@ -610,17 +610,17 @@ export function TestCaseTable({
                            <Button 
                              variant="ghost" 
                              size="icon"
-                             className="h-7 w-7"
+                             className="h-8 w-8"
                              onClick={() => onRunSelected ? onRunSelected([testCase.id]) : null}
                            >
-                             <Play className="h-3.5 w-3.5" />
+                             <Play className="h-4 w-4" />
                              <span className="sr-only">Run</span>
                            </Button>
                                                       
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
                                 <span className="sr-only">More</span>
                               </Button>
                             </DropdownMenuTrigger>

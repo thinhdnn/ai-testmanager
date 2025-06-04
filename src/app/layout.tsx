@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Delius } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Providers } from '@/components/providers';
 
-const fontSans = Delius({
+const fontSans = Inter({
   weight: '400',
   subsets: ['latin'],
   variable: '--font-sans',
