@@ -45,6 +45,14 @@ export default function ProjectDetailPage() {
   const [selectedTestResult, setSelectedTestResult] = useState<any | null>(null);
   const [isTestResultDialogOpen, setIsTestResultDialogOpen] = useState(false);
 
+  const tabList = [
+    { value: 'overview', label: 'Overview' },
+    { value: 'test-cases', label: `Test Cases (${project?.testCases?.length || 0})` },
+    { value: 'fixtures', label: `Fixtures (${project?.fixtures?.length || 0})` },
+    { value: 'results', label: `Results (${project?.testResults?.length || 0})` },
+    { value: 'configuration', label: 'Configuration' },
+  ];
+
   // Load initial active tab from localStorage or URL
   useEffect(() => {
     // Key for localStorage
@@ -246,208 +254,220 @@ export default function ProjectDetailPage() {
         </div>
       </div>
       
-      <Tabs defaultValue="overview" className="w-full" value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="test-cases">Test Cases ({project.testCases?.length || 0})</TabsTrigger>
-          <TabsTrigger value="fixtures">Fixtures ({project.fixtures?.length || 0})</TabsTrigger>
-          <TabsTrigger value="results">Results ({project.testResults?.length || 0})</TabsTrigger>
-          <TabsTrigger value="configuration">Configuration</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-card p-6 rounded-lg border shadow-sm">
-              <h3 className="text-xl font-semibold mb-4">Project Details</h3>
-              <dl className="space-y-4">
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">URL</dt>
-                  <dd className="mt-1">
-                    <a 
-                      href={project.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      {project.url}
-                    </a>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Created</dt>
-                  <dd className="mt-1">{new Date(project.createdAt).toLocaleDateString()}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Last Updated</dt>
-                  <dd className="mt-1">{new Date(project.updatedAt).toLocaleDateString()}</dd>
-                </div>
-              </dl>
+      <div className="flex gap-2 mb-6">
+        {tabList.map(tab => (
+          <button
+            key={tab.value}
+            className={`px-5 py-2 border border-black font-medium transition-all duration-150
+              ${activeTab === tab.value ? 'bg-yellow-300 font-bold' : 'bg-transparent'}
+            `}
+            onClick={() => handleTabChange(tab.value)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      
+      <div className="w-full">
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-card p-6 rounded-lg border shadow-sm">
+                <h3 className="text-xl font-semibold mb-4">Project Details</h3>
+                <dl className="space-y-4">
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">URL</dt>
+                    <dd className="mt-1">
+                      <a 
+                        href={project.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {project.url}
+                      </a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Created</dt>
+                    <dd className="mt-1">{new Date(project.createdAt).toLocaleDateString()}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Last Updated</dt>
+                    <dd className="mt-1">{new Date(project.updatedAt).toLocaleDateString()}</dd>
+                  </div>
+                </dl>
+              </div>
+              
+              <div className="bg-card p-6 rounded-lg border shadow-sm">
+                <h3 className="text-xl font-semibold mb-4">Test Statistics</h3>
+                <dl className="space-y-4">
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Total Test Cases</dt>
+                    <dd className="mt-1 text-2xl font-bold">{project.testCases?.length || 0}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Total Fixtures</dt>
+                    <dd className="mt-1 text-2xl font-bold">{project.fixtures?.length || 0}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Test Results</dt>
+                    <dd className="mt-1 text-2xl font-bold">{project.testResults?.length || 0}</dd>
+                  </div>
+                </dl>
+              </div>
             </div>
             
             <div className="bg-card p-6 rounded-lg border shadow-sm">
-              <h3 className="text-xl font-semibold mb-4">Test Statistics</h3>
-              <dl className="space-y-4">
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Total Test Cases</dt>
-                  <dd className="mt-1 text-2xl font-bold">{project.testCases?.length || 0}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Total Fixtures</dt>
-                  <dd className="mt-1 text-2xl font-bold">{project.fixtures?.length || 0}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Test Results</dt>
-                  <dd className="mt-1 text-2xl font-bold">{project.testResults?.length || 0}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-          
-          <div className="bg-card p-6 rounded-lg border shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">Recent Test Results</h3>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/projects/${project.id}?tab=results`}>
-                  View All Results
-                </Link>
-              </Button>
-            </div>
-            
-            {project.testResults?.length === 0 ? (
-              <p className="text-muted-foreground">No test results yet</p>
-            ) : (
-              <div className="space-y-2">
-                {project.testResults?.slice(0, 5).map((result: any) => (
-                  <div key={result.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-slate-50">
-                    <div className="flex items-center gap-3">
-                      {result.success ? (
-                        <CheckCircle className="text-green-500 h-5 w-5" />
-                      ) : (
-                        <XCircle className="text-red-500 h-5 w-5" />
-                      )}
-                      <div>
-                      <p className="font-medium">{result.testCase?.name || 'Unnamed Test'}</p>
-                        <div className="text-sm text-muted-foreground">
-                          Browser: {result.browser || 'chromium'} • 
-                          Duration: {result.executionTime ? (result.executionTime / 1000).toFixed(2) : '0'}s • 
-                          {formatDistance(new Date(result.createdAt), new Date(), { addSuffix: true })}
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">Recent Test Results</h3>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/projects/${project.id}?tab=results`}>
+                    View All Results
+                  </Link>
+                </Button>
+              </div>
+              
+              {project.testResults?.length === 0 ? (
+                <p className="text-muted-foreground">No test results yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {project.testResults?.slice(0, 5).map((result: any) => (
+                    <div key={result.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-slate-50">
+                      <div className="flex items-center gap-3">
+                        {result.success ? (
+                          <CheckCircle className="text-green-500 h-5 w-5" />
+                        ) : (
+                          <XCircle className="text-red-500 h-5 w-5" />
+                        )}
+                        <div>
+                        <p className="font-medium">{result.testCase?.name || 'Unnamed Test'}</p>
+                          <div className="text-sm text-muted-foreground">
+                            Browser: {result.browser || 'chromium'} • 
+                            Duration: {result.executionTime ? (result.executionTime / 1000).toFixed(2) : '0'}s • 
+                            {formatDistance(new Date(result.createdAt), new Date(), { addSuffix: true })}
+                          </div>
                         </div>
                       </div>
+                      <Badge variant={result.success ? "default" : "destructive"}>
+                        {result.status}
+                      </Badge>
                     </div>
-                    <Badge variant={result.success ? "default" : "destructive"}>
-                      {result.status}
-                    </Badge>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {activeTab === 'test-cases' && (
+          <div>
+            {(!project.testCases || project.testCases.length === 0) ? (
+              <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
+                <div className="bg-primary/10 rounded-full p-4 mx-auto w-fit mb-4">
+                  <PlusCircle className="h-10 w-10 text-primary" />
+                </div>
+                <h3 className="text-xl font-medium mb-2">No test cases yet</h3>
+                <p className="text-muted-foreground mb-6">
+                  Get started by creating your first test case
+                </p>
+                <Button asChild>
+                  <Link href={`/projects/${project.id}/test-cases/new`}>
+                    Create Test Case
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const allTestCaseIds = project.testCases.map(tc => tc.id);
+                      handleRunSelectedTests(allTestCaseIds);
+                    }}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Run All Test Cases
+                  </Button>
+                </div>
+                <TestCaseTable
+                  testCases={project.testCases.map(testCase => ({
+                    ...testCase,
+                    tags: testCase.tags || null,
+                    lastRun: testCase.lastRun || null,
+                    _count: testCase._count || { Steps: 0 }
+                  }))}
+                  projectId={project.id}
+                  pagination={{
+                    page: 1,
+                    limit: project.testCases.length,
+                    totalItems: project.testCases.length,
+                    totalPages: 1
+                  }}
+                  filters={{
+                    search: '',
+                    status: '',
+                    tags: []
+                  }}
+                  onRunSelected={handleRunSelectedTests}
+                  onTestCaseDeleted={handleTestCaseDeleted}
+                />
               </div>
             )}
           </div>
-        </TabsContent>
-        
-        <TabsContent value="test-cases">
-          {(!project.testCases || project.testCases.length === 0) ? (
-            <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
-              <div className="bg-primary/10 rounded-full p-4 mx-auto w-fit mb-4">
-                <PlusCircle className="h-10 w-10 text-primary" />
-              </div>
-              <h3 className="text-xl font-medium mb-2">No test cases yet</h3>
-              <p className="text-muted-foreground mb-6">
-                Get started by creating your first test case
-              </p>
-              <Button asChild>
-                <Link href={`/projects/${project.id}/test-cases/new`}>
-                  Create Test Case
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const allTestCaseIds = project.testCases.map(tc => tc.id);
-                    handleRunSelectedTests(allTestCaseIds);
-                  }}
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Run All Test Cases
+        )}
+        {activeTab === 'fixtures' && (
+          <div>
+            {(!project.fixtures || project.fixtures.length === 0) ? (
+              <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
+                <div className="bg-primary/10 rounded-full p-4 mx-auto w-fit mb-4">
+                  <PlusCircle className="h-10 w-10 text-primary" />
+                </div>
+                <h3 className="text-xl font-medium mb-2">No fixtures yet</h3>
+                <p className="text-muted-foreground mb-6">
+                  Create reusable fixtures for your test cases
+                </p>
+                <Button asChild>
+                  <Link href={`/projects/${project.id}/fixtures/new`}>
+                    Create Fixture
+                  </Link>
                 </Button>
               </div>
-              <TestCaseTable
-                testCases={project.testCases.map(testCase => ({
-                  ...testCase,
-                  tags: testCase.tags || null,
-                  lastRun: testCase.lastRun || null,
-                  _count: testCase._count || { Steps: 0 }
+            ) : (
+              <FixtureTable
+                fixtures={project.fixtures.map(fixture => ({
+                  ...fixture,
+                  _count: fixture._count || { Steps: 0 }
                 }))}
                 projectId={project.id}
                 pagination={{
                   page: 1,
-                  limit: project.testCases.length,
-                  totalItems: project.testCases.length,
+                  limit: project.fixtures.length,
+                  totalItems: project.fixtures.length,
                   totalPages: 1
                 }}
                 filters={{
                   search: '',
-                  status: '',
-                  tags: []
+                  type: ''
                 }}
-                onRunSelected={handleRunSelectedTests}
-                onTestCaseDeleted={handleTestCaseDeleted}
               />
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="fixtures">
-          {(!project.fixtures || project.fixtures.length === 0) ? (
-            <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
-              <div className="bg-primary/10 rounded-full p-4 mx-auto w-fit mb-4">
-                <PlusCircle className="h-10 w-10 text-primary" />
-              </div>
-              <h3 className="text-xl font-medium mb-2">No fixtures yet</h3>
-              <p className="text-muted-foreground mb-6">
-                Create reusable fixtures for your test cases
-              </p>
-              <Button asChild>
-                <Link href={`/projects/${project.id}/fixtures/new`}>
-                  Create Fixture
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <FixtureTable
-              fixtures={project.fixtures.map(fixture => ({
-                ...fixture,
-                _count: fixture._count || { Steps: 0 }
-              }))}
-              projectId={project.id}
-              pagination={{
-                page: 1,
-                limit: project.fixtures.length,
-                totalItems: project.fixtures.length,
-                totalPages: 1
-              }}
-              filters={{
-                search: '',
-                type: ''
-              }}
-            />
-          )}
-        </TabsContent>
-        
-        <TabsContent value="results">
-          <TestResultsSection projectId={project.id} />
-        </TabsContent>
-        
-        <TabsContent value="configuration">
-          <div className="bg-card rounded-lg border shadow-sm">
-            <ProjectConfigForm projectId={project.id} />
+            )}
           </div>
-        </TabsContent>
-      </Tabs>
+        )}
+        {activeTab === 'results' && (
+          <div>
+            <TestResultsSection projectId={project.id} />
+          </div>
+        )}
+        {activeTab === 'configuration' && (
+          <div>
+            <div className="bg-card rounded-lg border shadow-sm">
+              <ProjectConfigForm projectId={project.id} />
+            </div>
+          </div>
+        )}
+      </div>
       
       {/* Run Test Dialog */}
       <RunTestDialog
