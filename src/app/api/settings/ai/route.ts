@@ -3,44 +3,12 @@ import { getAISettings } from "@/lib/ai/ai-settings";
 import { updateSettings } from "@/lib/db/repositories/settings-repository";
 import { checkPermission } from "@/lib/rbac/check-permission";
 import { getCurrentUserEmail } from "@/lib/auth/session";
+import { prisma } from '@/lib/db/prisma';
 
 // GET /api/settings/ai - Get all AI provider settings
-export async function GET(request: NextRequest) {
-  try {
-    const aiSettings = await getAISettings();
-    
-    // Mask API keys for security in response
-    const maskedSettings = { ...aiSettings };
-    const apiKeyFields = [
-      "openai_api_key",
-      "gemini_api_key",
-      "grok_api_key",
-      "claude_api_key",
-    ];
-    
-    apiKeyFields.forEach((field) => {
-      if (maskedSettings[field as keyof typeof maskedSettings]) {
-        maskedSettings[field as keyof typeof maskedSettings] = "********";
-      }
-    });
-    
-    return NextResponse.json(
-      {
-        success: true,
-        data: maskedSettings,
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Error fetching AI settings:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch AI settings",
-      },
-      { status: 500 }
-    );
-  }
+export async function GET() {
+  const setting = await prisma.setting.findUnique({ where: { key: 'ai_settings' } });
+  return NextResponse.json(setting ? JSON.parse(setting.value) : {});
 }
 
 // PUT /api/settings/ai - Update AI settings
@@ -127,4 +95,15 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function POST(req: NextRequest) {
+  const data = await req.json();
+  const value = JSON.stringify(data);
+  await prisma.setting.upsert({
+    where: { key: 'ai_settings' },
+    update: { value },
+    create: { key: 'ai_settings', value },
+  });
+  return NextResponse.json({ success: true });
 } 

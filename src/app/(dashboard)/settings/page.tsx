@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 function AiSettingsForm() {
@@ -11,6 +11,23 @@ function AiSettingsForm() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch settings from API on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/settings/ai');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.openai) setOpenai(data.openai);
+        if (data.gemini) setGemini(data.gemini);
+        if (data.claude) setClaude(data.claude);
+        if (data.activeProvider) setActiveProvider(data.activeProvider);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   const handleChange = (provider: 'openai' | 'gemini' | 'claude', field: 'url' | 'apiKey' | 'model', value: string) => {
     if (provider === 'openai') setOpenai({ ...openai, [field]: value });
@@ -33,13 +50,26 @@ function AiSettingsForm() {
       setSaving(false);
       return;
     }
-    // Simulate API call
-    setTimeout(() => {
-      setSaving(false);
+    // Save to API
+    try {
+      const res = await fetch('/api/settings/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          openai,
+          gemini,
+          claude,
+          activeProvider,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to save');
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-    }, 1000);
-    // Here you would also save activeProvider
+    } catch (e) {
+      setError('Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const providers: Array<{ label: string; state: { url: string; apiKey: string; model: string }; key: 'openai' | 'gemini' | 'claude' }> = [

@@ -84,8 +84,8 @@ export default function DashboardPage() {
       
       {/* Main dashboard content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Trend chart - takes 2/3 width on larger screens */}
-        <div className="lg:col-span-2">
+        {/* Trend chart - takes full width now */}
+        <div className="lg:col-span-3">
           <Card className="shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-xl font-medium">Test Results Trend</CardTitle>
@@ -96,24 +96,7 @@ export default function DashboardPage() {
                 data={stats.trends}
                 title="Test Results Trend" 
                 description="Test outcomes over the last 30 days"
-                height={350}
-              />
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Tag heatmap - takes 1/3 width on larger screens */}
-        <div>
-          <Card className="shadow-sm h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xl font-medium">Tag Usage & Pass Rate</CardTitle>
-              <p className="text-sm text-muted-foreground">Test case tags colored by pass rate</p>
-            </CardHeader>
-            <CardContent>
-              <TagHeatmap 
-                tags={stats.tagStats}
-                title="Tag Usage & Pass Rate" 
-                description="Test case tags colored by pass rate"
+                height={250}
               />
             </CardContent>
           </Card>
