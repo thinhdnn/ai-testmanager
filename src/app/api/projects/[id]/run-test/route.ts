@@ -120,13 +120,13 @@ export async function POST(
       const startTime = Date.now();
 
       try {
-        // Add TEST_RESULT_NAME to the command
-        const commandWithTestResultName = `TEST_RESULT_NAME=${testResult.testResultFileName || ''} ${command}`;
+        // Add output directory to the command
+        const commandWithOutput = `${command} --output=${testResult.testResultFileName}`;
         
         console.log(`Executing command in directory: ${absoluteProjectPath}`);
-        console.log(`Command: ${commandWithTestResultName}`);
+        console.log(`Command: ${commandWithOutput}`);
 
-        const childProcess = exec(commandWithTestResultName, { 
+        const childProcess = exec(commandWithOutput, { 
           maxBuffer: 1024 * 1024 * 10,
           cwd: absoluteProjectPath
         });
