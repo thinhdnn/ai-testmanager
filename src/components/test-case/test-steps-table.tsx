@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { usePermission } from '@/lib/auth/use-permission';
+import { isAutoUseAISuggestionEnabledClient } from '@/lib/ai/ai-client';
 import {
   Table,
   TableBody,
@@ -49,12 +50,14 @@ import {
   Code,
   ChevronRight,
   Target,
-  Wrench
+  Wrench,
+  Wand2
 } from 'lucide-react';
 import { TestCaseService } from '@/lib/api/services/test-case-service';
 import { FixtureService } from '@/lib/api/services/fixture-service';
 import { Step as ApiStep } from '@/lib/api/interfaces';
 import { AddStepForm, StepFormData } from '@/components/step/add-step-form';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Step extends ApiStep {
   disabled: boolean;
@@ -109,6 +112,12 @@ export function TestStepsTable({
   const [stepToMove, setStepToMove] = useState<Step | null>(null);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [isLoadingFixtures, setIsLoadingFixtures] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importCode, setImportCode] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [autoUseAISuggestion, setAutoUseAISuggestion] = useState(true);
+  const [selectedSteps, setSelectedSteps] = useState<Set<string>>(new Set());
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   
   // Memoize service instances to prevent unnecessary re-creation
   const testCaseService = useMemo(() => new TestCaseService(), []);
@@ -148,6 +157,21 @@ export function TestStepsTable({
       setIsLoadingFixtures(false);
     }
   };
+  
+  // Check server-side AI suggestion setting on mount
+  useEffect(() => {
+    async function checkAISetting() {
+      try {
+        const isEnabled = await isAutoUseAISuggestionEnabledClient();
+        setAutoUseAISuggestion(isEnabled);
+      } catch (error) {
+        console.error('Error checking AI suggestion setting:', error);
+        setAutoUseAISuggestion(false);
+      }
+    }
+    
+    checkAISetting();
+  }, []);
   
   // Handle deleting a step
   const handleDeleteStep = async () => {
@@ -561,6 +585,131 @@ export function TestStepsTable({
     }
   };
 
+  // Add new function to handle import
+  const handleImport = async () => {
+    try {
+      setIsImporting(true);
+
+      // Split the code into lines and filter out empty lines
+      const codeLines = importCode
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      if (codeLines.length === 0) {
+        toast.error('Please enter some code to import');
+        return;
+      }
+
+      // Call the API
+      const response = await fetch(`/api/projects/${projectId}/test-cases/${testCaseId}/steps/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          codeLines
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to import steps');
+      }
+
+      const createdSteps = await response.json();
+
+      // Update local state with new steps
+      setSteps(prevSteps => [...prevSteps, ...createdSteps.map(convertApiStep)]);
+      
+      // If there's an onVersionUpdate callback, update the parent component
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
+      }
+      
+      // Notify the parent component to refresh steps
+      if (onStepsChange) {
+        onStepsChange();
+      }
+
+      toast.success('Steps imported successfully');
+      setIsImportDialogOpen(false);
+      setImportCode('');
+      
+      // Also refresh the router
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Add handler for selecting/deselecting all steps
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedSteps(new Set(steps.map(step => step.id)));
+    } else {
+      setSelectedSteps(new Set());
+    }
+  };
+
+  // Add handler for selecting/deselecting individual step
+  const handleSelectStep = (stepId: string, checked: boolean) => {
+    const newSelected = new Set(selectedSteps);
+    if (checked) {
+      newSelected.add(stepId);
+    } else {
+      newSelected.delete(stepId);
+    }
+    setSelectedSteps(newSelected);
+  };
+
+  // Add handler for bulk deletion
+  const handleBulkDelete = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Delete each selected step
+      for (const stepId of selectedSteps) {
+        const step = steps.find(s => s.id === stepId);
+        if (!step) continue;
+
+        if (isFixture && step.fixtureId) {
+          await fixtureService.deleteFixtureStep(projectId, step.fixtureId, stepId);
+        } else if (testCaseId) {
+          await testCaseService.deleteTestCaseStep(projectId, testCaseId, stepId);
+        }
+      }
+      
+      // Remove deleted steps from local state
+      setSteps(prevSteps => prevSteps.filter(step => !selectedSteps.has(step.id)));
+      
+      // Clear selection
+      setSelectedSteps(new Set());
+      
+      // Update version if needed
+      if (onVersionUpdate) {
+        onVersionUpdate('latest');
+      }
+      
+      // Notify parent to refresh
+      if (onStepsChange) {
+        onStepsChange();
+      }
+      
+      toast.success('Selected steps deleted successfully');
+      setIsBulkDeleteDialogOpen(false);
+      
+      // Refresh router
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -572,15 +721,35 @@ export function TestStepsTable({
           </div>
           
           {steps.length > 0 && (
-          <Button 
-            onClick={() => {
-                setIsAddDialogOpen(true);
-            }}
-            disabled={!canEdit}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Step
-          </Button>
+            <div className="flex gap-2">
+              {selectedSteps.size > 0 && (
+                <Button 
+                  variant="destructive"
+                  onClick={() => setIsBulkDeleteDialogOpen(true)}
+                  disabled={!canEdit || isLoading}
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete Selected ({selectedSteps.size})
+                </Button>
+              )}
+              {autoUseAISuggestion && (
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsImportDialogOpen(true)}
+                  disabled={!canEdit}
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Import with AI
+                </Button>
+              )}
+              <Button 
+                onClick={() => setIsAddDialogOpen(true)}
+                disabled={!canEdit}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Step
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -591,21 +760,38 @@ export function TestStepsTable({
             <p className="text-muted-foreground mb-4">
               This test case has no steps defined yet.
             </p>
+            <div className="flex gap-2 justify-center">
+              {autoUseAISuggestion && (
             <Button 
-              onClick={() => {
-                setIsAddDialogOpen(true);
-              }}
+                  variant="outline"
+                  onClick={() => setIsImportDialogOpen(true)}
+                  disabled={!canEdit}
+                >
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Import with AI
+                </Button>
+              )}
+              <Button 
+                onClick={() => setIsAddDialogOpen(true)}
               disabled={!canEdit}
             >
               <Plus className="mr-2 h-4 w-4" />
               Add First Step
             </Button>
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox 
+                      checked={selectedSteps.size === steps.length}
+                      onCheckedChange={handleSelectAll}
+                      disabled={!canEdit}
+                    />
+                  </TableHead>
                   <TableHead className="w-[80px]">Order</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Data</TableHead>
@@ -622,6 +808,13 @@ export function TestStepsTable({
                       key={step.id || 'unknown'} 
                       className={`${step.disabled === true ? 'bg-muted/30' : ''} h-[40px]`}
                     >
+                      <TableCell className="py-1">
+                        <Checkbox 
+                          checked={selectedSteps.has(step.id)}
+                          onCheckedChange={(checked: boolean) => handleSelectStep(step.id, checked)}
+                          disabled={!canEdit}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium py-1">
                         <div className="flex items-center gap-1">
                           {typeof step.order === 'number' ? step.order : '-'}
@@ -860,6 +1053,87 @@ export function TestStepsTable({
                 </>
               ) : (
                 'Move'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import with AI Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-none w-auto min-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Import Steps with AI</DialogTitle>
+            <DialogDescription>
+              Paste your Playwright code here. Each line will be converted into a test step using AI.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="code" className="text-sm font-medium">
+                Playwright Code
+              </label>
+              <Textarea
+                id="code"
+                placeholder="await page.click('button');"
+                value={importCode}
+                onChange={(e) => setImportCode(e.target.value)}
+                className="h-[200px] font-mono whitespace-pre"
+              />
+              <p className="text-sm text-muted-foreground">
+                Enter each Playwright command on a new line.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsImportDialogOpen(false);
+              setImportCode('');
+            }} disabled={isImporting}>
+              Cancel
+            </Button>
+            <Button onClick={handleImport} disabled={isImporting}>
+              {isImporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                'Import'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Dialog */}
+      <Dialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Selected Steps</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedSteps.size} selected steps? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkDeleteDialogOpen(false)} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete} 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                `Delete ${selectedSteps.size} Steps`
               )}
             </Button>
           </DialogFooter>

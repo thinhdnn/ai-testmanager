@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { X, Plus } from 'lucide-react';
 import { TestCaseService } from '@/lib/api/services';
 import { TestCase as ApiTestCase } from '@/lib/api/interfaces';
+import { fixTestCaseNameClient, isAutoUseAISuggestionEnabledClient } from '@/lib/ai/ai-client';
 
 // Define form schema with Zod
 const formSchema = z.object({
@@ -75,9 +76,12 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
   console.log('TestCaseForm render');
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
+  const [isFixingName, setIsFixingName] = useState(false);
+  const [serverAISuggestionEnabled, setServerAISuggestionEnabled] = useState(false);
+  const [allTags, setAllTags] = useState<TagOption[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   
   // Per seed-roles.ts: "project.update" permission is for both "Create and update projects, fixtures and test cases"
   const hasUpdatePermission = usePermission('project.update');
@@ -145,6 +149,21 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
       console.error('Error processing testCase tags:', error);
     }
   }, [testCase, form]);
+
+  // Check server-side AI suggestion setting on mount
+  useEffect(() => {
+    async function checkAISetting() {
+      try {
+        const isEnabled = await isAutoUseAISuggestionEnabledClient();
+        setServerAISuggestionEnabled(isEnabled);
+      } catch (error) {
+        console.error('Error checking AI suggestion setting:', error);
+        setServerAISuggestionEnabled(false);
+      }
+    }
+    
+    checkAISetting();
+  }, []);
 
   // Fetch tag options only once when component mounts
   useEffect(() => {
@@ -240,6 +259,29 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
     }
   }, [tagInput, handleAddTag]);
 
+  // Handle auto-fix test case name when Tab is pressed (only if server AI suggestion is disabled)
+  const handleTestCaseNameKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Only trigger client-side AI fix if server-side AI suggestion is disabled
+    if (e.key === 'Tab' && !e.shiftKey && !serverAISuggestionEnabled) {
+      const currentName = form.getValues('name');
+      if (currentName && currentName.trim() && !isFixingName) {
+        try {
+          setIsFixingName(true);
+          const fixedName = await fixTestCaseNameClient(currentName.trim());
+          if (fixedName && fixedName !== currentName.trim()) {
+            form.setValue('name', fixedName, { shouldDirty: true });
+            toast.success('Test case name has been improved');
+          }
+        } catch (error) {
+          console.error('Error fixing test case name:', error);
+          // Silently fail - don't show error to user as this is an enhancement feature
+        } finally {
+          setIsFixingName(false);
+        }
+      }
+    }
+  }, [form, isFixingName, serverAISuggestionEnabled]);
+
   // Handle form submission
   const onSubmit = async (values: FormValues) => {
     if (!hasUpdatePermission) {
@@ -329,12 +371,21 @@ export function TestCaseForm({ projectId, testCase, isEditing = false }: TestCas
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>Name {isFixingName && <span className="text-sm text-gray-500">(fixing...)</span>}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter test case name" {...field} />
+                    <Input 
+                      placeholder="Enter test case name" 
+                      {...field} 
+                      onKeyDown={handleTestCaseNameKeyDown}
+                      disabled={isFixingName}
+                    />
                   </FormControl>
                   <FormDescription>
-                    A descriptive name for the test case
+                    A descriptive name for the test case.{' '}
+                    {serverAISuggestionEnabled ? 
+                      'AI suggestions are automatically applied on save.' : 
+                      'Press Tab to auto-improve the name.'
+                    }
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

@@ -5,6 +5,8 @@ import { TestCaseVersionRepository } from '@/lib/db/repositories/test-case-versi
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
 import { prisma } from '@/lib/db/prisma';
+import { isAutoUseAISuggestionEnabled } from '@/lib/ai/ai-settings';
+import { getAIProvider } from '@/lib/ai/ai-provider';
 import path from 'path';
 
 // GET /api/projects/[id]/test-cases
@@ -49,12 +51,33 @@ export async function POST(
     }
 
     const { name, isManual, tags } = await request.json();
+    
+    // Check if AI suggestion is enabled and fix test case name if needed
+    let finalName = name;
+    try {
+      const isAIEnabled = await isAutoUseAISuggestionEnabled();
+      if (isAIEnabled && name && name.trim()) {
+        const aiProvider = await getAIProvider();
+        if (aiProvider) {
+          finalName = await aiProvider.fixTestCaseName(name.trim());
+          console.log(`AI fixed test case name: "${name}" -> "${finalName}"`);
+        } else {
+          console.warn('AI provider not configured, using original name');
+          finalName = name.trim();
+        }
+      }
+    } catch (error) {
+      console.error('Error fixing test case name with AI:', error);
+      // Continue with original name if AI fails
+      finalName = name;
+    }
+    
     const testCaseRepository = new TestCaseRepository();
     const testCaseVersionRepository = new TestCaseVersionRepository();
 
     // Create the test case
     const testCase = await testCaseRepository.create({
-      name,
+      name: finalName,
       projectId,
       isManual: isManual || false,
       tags: Array.isArray(tags) ? tags.join(',') : tags,

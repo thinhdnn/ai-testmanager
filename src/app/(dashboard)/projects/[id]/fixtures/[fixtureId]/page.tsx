@@ -50,6 +50,7 @@ import {
   Code,
   ChevronRight,
   FileText,
+  Wand2,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { TestStepsTable } from '@/components/test-case/test-steps-table';
@@ -66,6 +67,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AddStepForm, StepFormData } from '@/components/step/add-step-form';
 import { ProjectService, FixtureService } from '@/lib/api/services';
 import { Fixture as ApiFixture, FixtureVersion as ApiFixtureVersion, Step as ApiStep, Project } from '@/lib/api/interfaces';
+import { isAutoUseAISuggestionEnabledClient } from '@/lib/ai/ai-client';
 
 // Custom interfaces to handle type differences
 interface Fixture extends Omit<ApiFixture, 'versions' | 'steps'> {
@@ -134,6 +136,10 @@ export default function FixtureDetailPage() {
   const [isAddStepDialogOpen, setIsAddStepDialogOpen] = useState(false);
   const [activeVersion, setActiveVersion] = useState<FixtureVersion | null>(null);
   const [versionSteps, setVersionSteps] = useState<Step[]>([]);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importCode, setImportCode] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [autoUseAISuggestion, setAutoUseAISuggestion] = useState(true);
   
   const canEdit = usePermission('update', 'project', projectId);
   const canDelete = usePermission('update', 'project', projectId);
@@ -247,7 +253,22 @@ export default function FixtureDetailPage() {
   useEffect(() => {
     fetchData();
   }, [fixtureId, projectId]);
-  
+
+  // Check server-side AI suggestion setting on mount
+  useEffect(() => {
+    async function checkAISetting() {
+      try {
+        const isEnabled = await isAutoUseAISuggestionEnabledClient();
+        setAutoUseAISuggestion(isEnabled);
+      } catch (error) {
+        console.error('Error checking AI suggestion setting:', error);
+        setAutoUseAISuggestion(false);
+      }
+    }
+    
+    checkAISetting();
+  }, []);
+
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
@@ -391,6 +412,58 @@ export default function FixtureDetailPage() {
       toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setIsCloning(false);
+    }
+  };
+  
+  const handleImport = async () => {
+    try {
+      setIsImporting(true);
+
+      // Split the code into lines and filter out empty lines
+      const codeLines = importCode
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      if (codeLines.length === 0) {
+        toast.error('Please enter some code to import');
+        return;
+      }
+
+      // Call the API
+      const response = await fetch(`/api/projects/${projectId}/fixtures/${fixtureId}/steps/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          codeLines
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to import steps');
+      }
+
+      const createdSteps = await response.json();
+
+      // Update local state with new steps
+      setSteps(prevSteps => [...prevSteps, ...createdSteps.map(convertApiStep)]);
+      
+      toast.success('Steps imported successfully');
+      setIsImportDialogOpen(false);
+      setImportCode('');
+      
+      // Refresh fixture data
+      await refreshFixtureData();
+      
+      // Also refresh the router
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setIsImporting(false);
     }
   };
   
@@ -581,6 +654,15 @@ export default function FixtureDetailPage() {
                 {/* Conditionally render Add Step button only if steps exist */}
                 {canEdit && steps.length > 0 && (
                   <div className="flex space-x-2">
+                    {autoUseAISuggestion && (
+                      <Button 
+                        variant="outline"
+                        onClick={() => setIsImportDialogOpen(true)}
+                        disabled={isLoading}
+                      >
+                        <Wand2 className="mr-1 h-4 w-4" /> Import with AI
+                      </Button>
+                    )}
                     <Button 
                       onClick={() => {
                         setIsAddStepDialogOpen(true);
@@ -615,16 +697,27 @@ export default function FixtureDetailPage() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Define the steps for this fixture to start testing
                   </p>
-                  {/* Conditionally render Add First Step button only if no steps exist */}
+                  {/* Conditionally render Add First Step button and Import with AI button only if no steps exist */}
                   {canEdit && steps.length === 0 && (
-                    <Button
-                      onClick={() => {
-                        setIsAddStepDialogOpen(true);
-                      }}
-                      variant="outline"
-                    >
-                      <Plus className="mr-1 h-4 w-4" /> Add First Step
-                    </Button>
+                    <div className="flex space-x-2">
+                      {autoUseAISuggestion && (
+                        <Button 
+                          variant="outline"
+                          onClick={() => setIsImportDialogOpen(true)}
+                          disabled={isLoading}
+                        >
+                          <Wand2 className="mr-1 h-4 w-4" /> Import with AI
+                        </Button>
+                      )}
+                      <Button
+                        onClick={() => {
+                          setIsAddStepDialogOpen(true);
+                        }}
+                        variant="outline"
+                      >
+                        <Plus className="mr-1 h-4 w-4" /> Add First Step
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
@@ -839,6 +932,55 @@ export default function FixtureDetailPage() {
             onCancel={() => setIsAddStepDialogOpen(false)}
             isSubmitting={isAddingStep}
           />
+        </DialogContent>
+      </Dialog>
+      
+      {/* Import with AI Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-none w-auto min-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Import Steps with AI</DialogTitle>
+            <DialogDescription>
+              Paste your Playwright code here. Each line will be converted into a fixture step using AI.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="code" className="text-sm font-medium">
+                Playwright Code
+              </label>
+              <Textarea
+                id="code"
+                placeholder="await page.click('button');"
+                value={importCode}
+                onChange={(e) => setImportCode(e.target.value)}
+                className="h-[200px] font-mono whitespace-pre"
+              />
+              <p className="text-sm text-muted-foreground">
+                Enter each Playwright command on a new line.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsImportDialogOpen(false);
+              setImportCode('');
+            }} disabled={isImporting}>
+              Cancel
+            </Button>
+            <Button onClick={handleImport} disabled={isImporting}>
+              {isImporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                'Import'
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

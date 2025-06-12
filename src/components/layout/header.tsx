@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu, Bell, Sun, Moon, MenuIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { User } from "next-auth";
@@ -30,7 +30,12 @@ interface HeaderProps {
 export default function Header({ toggleSidebar, isSidebarOpen, user }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const userRoles = useUserRoles();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Get user initials for avatar fallback
   const getInitials = (name?: string | null) => {
@@ -68,13 +73,17 @@ export default function Header({ toggleSidebar, isSidebarOpen, user }: HeaderPro
             variant="ghost" 
             size="icon" 
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            title={mounted ? `Switch to ${theme === "dark" ? "light" : "dark"} mode` : "Toggle theme"}
             className="rounded-full"
           >
-            {theme === "dark" ? (
-              <Sun className="h-5 w-5 transition-transform hover:rotate-45" />
+            {mounted ? (
+              theme === "dark" ? (
+                <Sun className="h-5 w-5 transition-transform hover:rotate-45" />
+              ) : (
+                <Moon className="h-5 w-5 transition-transform hover:rotate-12" />
+              )
             ) : (
-              <Moon className="h-5 w-5 transition-transform hover:rotate-12" />
+              <Sun className="h-5 w-5 transition-transform hover:rotate-45" />
             )}
             <span className="sr-only">Toggle theme</span>
           </Button>

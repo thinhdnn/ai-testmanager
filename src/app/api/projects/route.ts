@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/options';
 import { ProjectRepository } from '@/lib/db/repositories/project-repository';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
 import { CreateProjectRequest, ProjectListResponse } from '@/types';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db/prisma';
 
 // GET /api/projects
 export async function GET(request: NextRequest) {
@@ -124,8 +126,8 @@ export async function POST(request: NextRequest) {
       // Create default configuration settings
       const defaultSettings = [
         // Playwright settings
-        { category: 'playwright', key: 'timeout', value: '3000' },
-        { category: 'playwright', key: 'expectTimeout', value: '5000' },
+        { category: 'playwright', key: 'timeout', value: '30000' },
+        { category: 'playwright', key: 'expectTimeout', value: '10000' },
         { category: 'playwright', key: 'retries', value: '1' },
         { category: 'playwright', key: 'workers', value: '1' },
         { category: 'playwright', key: 'fullyParallel', value: 'false' },

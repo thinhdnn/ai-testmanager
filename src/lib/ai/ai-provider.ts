@@ -3,45 +3,13 @@ import { getAISettings, AIServiceType } from "./ai-settings";
 
 // Định nghĩa interface chung cho tất cả các AI providers
 export interface AIProvider {
-  // Core functionality
-  generatePlaywrightFromSteps(
-    testCaseName: string,
-    testSteps: Array<{
-      id: string;
-      order: number;
-      action: string;
-      data?: string | null;
-      expected?: string | null;
-    }>,
-    existingCode?: string,
-    options?: {
-      preserveImports?: boolean;
-      preserveFixtures?: boolean;
-      preserveSetup?: boolean;
-      preserveTeardown?: boolean;
-      tags?: string[];
-      provider?: AIServiceType;
-    }
-  ): Promise<string>;
-
-  // Additional common methods
-  extractJSONFromText(text: string, provider?: AIServiceType): Record<string, unknown>;
-
-  generatePlaywrightTestStep(request: Record<string, unknown>, provider?: AIServiceType): Promise<Record<string, unknown>>;
-  generatePlaywrightTestStepWithHTML(request: Record<string, unknown>, provider?: AIServiceType): Promise<Record<string, unknown>>;
-  analyzeAndGenerateTestStep(description: string, provider?: AIServiceType): Promise<Record<string, unknown>>;
-  generatePlaywrightCodeFromStep(
-    stepAction: string,
-    stepData?: string | null,
-    stepExpected?: string | null,
-    provider?: AIServiceType
-  ): Promise<string>;
-  analyzePlaywrightCode(playwrightCode: string, provider?: AIServiceType): Promise<Record<string, unknown>>;
-
-  // Spelling and vocabulary correction
+  // Core functionality that actually exists in AIService
+  extractJSONFromText(text: string): any;
+  analyzePlaywrightCode(playwrightCode: string, provider?: AIServiceType): Promise<any>;
+  analyzeAndGenerateTestStep(description: string, provider?: AIServiceType): Promise<any>;
+  analyzeAndGenerateMultipleTestSteps(descriptions: string[], provider?: AIServiceType): Promise<any[]>;
+  fixStepText(text: string, provider?: AIServiceType): Promise<string>;
   fixSpellingAndVocabulary(text: string, provider?: AIServiceType): Promise<string>;
-
-  // New method
   fixTestCaseName(testCaseName: string, provider?: AIServiceType): Promise<string>;
 }
 
@@ -89,23 +57,17 @@ export async function getAIProvider() {
 // Fallback provider implementation
 function createFallbackProvider(): AIProvider {
   return {
-    generatePlaywrightFromSteps: async () => {
-      throw new Error("AI service not available");
-    },
     extractJSONFromText: () => ({}),
-    generatePlaywrightTestStep: async () => {
-      throw new Error("AI service not available");
-    },
-    generatePlaywrightTestStepWithHTML: async () => {
+    analyzePlaywrightCode: async () => {
       throw new Error("AI service not available");
     },
     analyzeAndGenerateTestStep: async () => {
       throw new Error("AI service not available");
     },
-    generatePlaywrightCodeFromStep: async () => {
+    analyzeAndGenerateMultipleTestSteps: async () => {
       throw new Error("AI service not available");
     },
-    analyzePlaywrightCode: async () => {
+    fixStepText: async () => {
       throw new Error("AI service not available");
     },
     fixSpellingAndVocabulary: async () => {

@@ -13,7 +13,7 @@
     "seed-tags": "npx tsx prisma/seed-tags.ts"
   },
   "prisma": {
-    "seed": "ts-node --esm prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

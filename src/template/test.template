@@ -21,6 +21,9 @@ test('{{testCaseName}}', async (
 ) => {
 {{/if}}
 
+  // Always go to baseURL at the beginning
+  await page.goto('/');
+
   // Test Steps
   {{#each steps}}
   // Step {{add @index 1}}: {{action}}

@@ -49,6 +49,19 @@ async function main(): Promise<void> {
     throw new Error("Failed to seed default tags");
   }
 
+  // Step 4: Seed AI settings
+  console.log("\n=============================================");
+  console.log("STEP 4: Seeding AI settings");
+  console.log("=============================================\n");
+  
+  const seedAISettingsResult = spawnSync("npx", ["tsx", path.join(__dirname, "seed-ai-settings.ts")], {
+    stdio: "inherit",
+  });
+
+  if (seedAISettingsResult.status !== 0) {
+    throw new Error("Failed to seed AI settings");
+  }
+
   console.log("\n=============================================");
   console.log("DATABASE SEEDING COMPLETED SUCCESSFULLY!");
   console.log("=============================================\n");

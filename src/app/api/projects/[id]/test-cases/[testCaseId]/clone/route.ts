@@ -5,6 +5,8 @@ import { StepRepository } from '@/lib/db/repositories/step-repository';
 import { checkResourcePermission } from '@/lib/rbac/check-permission';
 import { getCurrentUserEmail } from '@/lib/auth/session';
 import { TestManagerService } from '@/lib/playwright/test-manager.service';
+import { isAutoUseAISuggestionEnabled } from '@/lib/ai/ai-settings';
+import { getAIProvider } from '@/lib/ai/ai-provider';
 import * as path from 'path';
 
 // Function to generate a unique test case name
@@ -85,12 +87,32 @@ export async function POST(
     // Use a transaction to ensure all operations succeed or fail together
     const result = await prisma.$transaction(async (tx) => {
       // Generate a unique name for the cloned test case
-      const clonedName = await generateUniqueTestCaseName(sourceTestCase.name, projectId);
+      const baseClonedName = await generateUniqueTestCaseName(sourceTestCase.name, projectId);
+      
+      // Try to fix test case name with AI if enabled
+      let finalClonedName = baseClonedName;
+      try {
+        const isAIEnabled = await isAutoUseAISuggestionEnabled();
+        if (isAIEnabled && baseClonedName && baseClonedName.trim()) {
+          const aiProvider = await getAIProvider();
+          if (aiProvider) {
+            finalClonedName = await aiProvider.fixTestCaseName(baseClonedName.trim());
+            console.log(`AI fixed cloned test case name: "${baseClonedName}" -> "${finalClonedName}"`);
+          } else {
+            console.warn('AI provider not configured, using original name');
+            finalClonedName = baseClonedName.trim();
+          }
+        }
+      } catch (error) {
+        console.error('Error fixing cloned test case name with AI:', error);
+        // Continue with original cloned name if AI fails
+        finalClonedName = baseClonedName;
+      }
 
       // Create a new test case as a clone
       const clonedTestCase = await tx.testCase.create({
         data: {
-          name: clonedName,
+          name: finalClonedName,
           status: sourceTestCase.status,
           isManual: sourceTestCase.isManual,
           tags: sourceTestCase.tags,
