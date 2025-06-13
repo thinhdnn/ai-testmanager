@@ -921,9 +921,6 @@ export function RunTestDialog({ isOpen, onClose, projectId, mode, testCaseId, te
                   <Button variant="outline" onClick={() => setIsResultDialogOpen(false)}>
                     Close
                   </Button>
-                  <Button onClick={() => setActiveTab('logs')} variant="default">
-                    View Logs
-                  </Button>
                 </div>
               </div>
             </div>
