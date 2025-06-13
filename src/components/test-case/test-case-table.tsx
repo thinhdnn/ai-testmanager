@@ -598,29 +598,25 @@ export function TestCaseTable({
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            asChild
-                            className="h-8 w-8"
+                            className="h-6 w-6"
+                            onClick={() => router.push(`/projects/${projectId}/test-cases/${testCase.id}/edit`)}
                           >
-                            <Link href={`/projects/${projectId}/test-cases/${testCase.id}/edit`}>
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Edit</span>
-                            </Link>
+                            <Edit className="h-3 w-3" />
+                            <span className="sr-only">Edit</span>
                           </Button>
-                                                      
-                           <Button 
-                             variant="ghost" 
-                             size="icon"
-                             className="h-8 w-8"
-                             onClick={() => onRunSelected ? onRunSelected([testCase.id]) : null}
-                           >
-                             <Play className="h-4 w-4" />
-                             <span className="sr-only">Run</span>
-                           </Button>
-                                                      
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => onRunSelected ? onRunSelected([testCase.id]) : null}
+                          >
+                            <Play className="h-3 w-3" />
+                            <span className="sr-only">Run</span>
+                          </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-4 w-4" />
+                              <Button variant="ghost" size="icon" className="h-6 w-6">
+                                <MoreHorizontal className="h-3 w-3" />
                                 <span className="sr-only">More</span>
                               </Button>
                             </DropdownMenuTrigger>
