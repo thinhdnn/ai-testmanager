@@ -45,6 +45,27 @@ export default function Header({ toggleSidebar, isSidebarOpen, user }: HeaderPro
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   };
 
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+        <div className="h-16 flex items-center justify-between px-0">
+          <div className="flex items-center">
+            <Link href="/" className="flex items-center pl-1">
+              <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold">
+                A
+              </div>
+              <span className="font-bold hidden md:inline-block text-lg tracking-tight ml-1">AI Test Manager</span>
+              <span className="font-bold md:hidden text-lg ml-1">ATM</span>
+            </Link>
+          </div>
+          <div className="flex items-center gap-2 pr-4">
+            <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="h-16 flex items-center justify-between px-0">
@@ -73,17 +94,13 @@ export default function Header({ toggleSidebar, isSidebarOpen, user }: HeaderPro
             variant="ghost" 
             size="icon" 
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            title={mounted ? `Switch to ${theme === "dark" ? "light" : "dark"} mode` : "Toggle theme"}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             className="rounded-full"
           >
-            {mounted ? (
-              theme === "dark" ? (
-                <Sun className="h-5 w-5 transition-transform hover:rotate-45" />
-              ) : (
-                <Moon className="h-5 w-5 transition-transform hover:rotate-12" />
-              )
-            ) : (
+            {theme === "dark" ? (
               <Sun className="h-5 w-5 transition-transform hover:rotate-45" />
+            ) : (
+              <Moon className="h-5 w-5 transition-transform hover:rotate-12" />
             )}
             <span className="sr-only">Toggle theme</span>
           </Button>

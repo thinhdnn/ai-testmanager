@@ -107,6 +107,8 @@ export function TestCaseTable({
   const [currentPage, setCurrentPage] = useState(pagination.page);
   const [itemsPerPage, setItemsPerPage] = useState(pagination.limit);
   const [selectedTestCases, setSelectedTestCases] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState<string>('');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
@@ -403,6 +405,37 @@ export function TestCaseTable({
     }
   };
 
+  // Function to update status for selected test cases
+  const handleBulkStatusUpdate = async () => {
+    if (!bulkStatus || selectedTestCases.length === 0) return;
+    
+    try {
+      setIsUpdatingStatus(true);
+      
+      // Gọi API bulk update status
+      await testCaseService.bulkUpdateStatus(projectId, selectedTestCases, bulkStatus);
+      
+      // Update local state
+      setLocalTestCases(prevTestCases =>
+        prevTestCases.map(tc => ({
+          ...tc,
+          status: selectedTestCases.includes(tc.id) ? bulkStatus : tc.status
+        }))
+      );
+      
+      // Reset selection và status
+      setSelectedTestCases([]);
+      setBulkStatus('');
+      
+      toast.success(`Updated status of ${selectedTestCases.length} test case(s)`);
+    } catch (error) {
+      console.error('Error updating test cases:', error);
+      toast.error('Failed to update test cases');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   return (
     <>
       <Card>
@@ -419,7 +452,7 @@ export function TestCaseTable({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="w-full sm:w-auto pl-9"
+                  className="w-[180px] h-9 pl-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]"
                 />
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 {searchTerm && (
@@ -432,7 +465,7 @@ export function TestCaseTable({
             
             <div className="flex gap-2 w-full sm:w-auto">
               <Select value={statusFilter} onValueChange={handleStatusChange}>
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -443,6 +476,40 @@ export function TestCaseTable({
                   ))}
                 </SelectContent>
               </Select>
+              
+              {selectedTestCases.length > 0 && (
+                <>
+                  <Select value={bulkStatus} onValueChange={setBulkStatus}>
+                    <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
+                      <SelectValue placeholder="Set status..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.filter(option => option.value !== 'all').map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleBulkStatusUpdate}
+                    disabled={!bulkStatus || isUpdatingStatus}
+                  >
+                    {isUpdatingStatus ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        Update Status ({selectedTestCases.length})
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
               
               {onRunSelected && selectedTestCases.length > 0 && (
                 <Button 
@@ -455,7 +522,7 @@ export function TestCaseTable({
                 </Button>
               )}
               
-              <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/test-cases/new`)}>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/test-cases/new`)}>
                 New Test Case
               </Button>
             </div>

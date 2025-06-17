@@ -17,7 +17,8 @@ import {
   Folder,
   ClipboardCheck,
   PlayCircle,
-  BarChart3
+  BarChart3,
+  GitBranch
 } from "lucide-react";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 
@@ -41,12 +42,20 @@ export default function Sidebar({ isOpen, isMobile, onClose }: SidebarProps) {
     {
       name: "Dashboard",
       href: "/dashboard",
-      icon: <LayoutDashboard className="h-5 w-5" />
+      icon: <LayoutDashboard className="h-5 w-5" />,
+      permission: "project.view"
     },
     {
       name: "Projects",
       href: "/projects",
-      icon: <Folder className="h-5 w-5" />
+      icon: <Folder className="h-5 w-5" />,
+      permission: "project.view"
+    },
+    {
+      name: "Releases",
+      href: "/releases",
+      icon: <GitBranch className="h-5 w-5" />,
+      permission: "project.view"
     },
     {
       name: "Users",

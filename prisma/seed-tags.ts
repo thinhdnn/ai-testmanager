@@ -21,35 +21,32 @@ async function seedTags(): Promise<void> {
     { value: "accessibility", label: "Accessibility" }
   ];
 
-
   for (const tag of defaultTags) {
     try {
-      // Check if tag already exists as a global tag
+      // Check if reference tag already exists
       const existingTag = await prisma.tag.findFirst({
         where: {
           value: tag.value,
-          projectId: null as any
+          projectId: null
         }
       });
 
       if (!existingTag) {
         await prisma.tag.create({
           data: {
-            value: tag.value,
-            label: tag.label,
-            projectId: null as any 
+            value: tag.value
           }
         });
-        console.log(`Created global tag: ${tag.label}`);
+        console.log(`Created reference tag: ${tag.value}`);
       } else {
-        console.log(`Global tag already exists: ${tag.label}`);
+        console.log(`Reference tag already exists: ${tag.value}`);
       }
     } catch (error) {
-      console.error(`Error creating tag ${tag.label}:`, error);
+      console.error(`Error creating tag ${tag.value}:`, error);
     }
   }
 
-  console.log("Global tags seeding completed!");
+  console.log("Reference tags seeding completed!");
 }
 
 seedTags()

@@ -13,6 +13,7 @@ type TestResultHistoryCreateInput = {
   lastRunBy?: string | null;
   browser?: string;
   videoUrl?: string;
+  fileName: string;
   testCaseExecutions?: Prisma.TestCaseExecutionCreateNestedManyWithoutTestResultInput;
 };
 

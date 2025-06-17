@@ -77,6 +77,31 @@ export interface TestResultHistory {
   testCaseExecutions: TestCaseExecution[];
 }
 
+export interface ReleaseWithTestCases {
+  id: string;
+  projectId: string;
+  name: string;
+  version: string;
+  description: string | null;
+  startDate: Date;
+  endDate: Date | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+  testCases: {
+    testCase: {
+      id: string;
+      name: string;
+      project: {
+        id: string;
+        name: string;
+      };
+    };
+  }[];
+}
+
 export interface FixturePageProps {
   params: Promise<{
     id: string;

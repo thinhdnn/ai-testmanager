@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Combines and merges class names using clsx and tailwind-merge
@@ -79,4 +80,8 @@ export function sanitizeFolderName(name: string): string {
     .replace(/[^a-z0-9-]/g, '-')
     .replace(/-+/g, '-') // Collapse multiple hyphens
     .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+} 
+
+export function generateTestResultFileName(): string {
+  return `test-result-${uuidv4()}`;
 } 

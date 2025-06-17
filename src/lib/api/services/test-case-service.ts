@@ -293,4 +293,12 @@ export class TestCaseService {
     const data = await response.json();
     return data.content;
   }
+
+  async bulkUpdateStatus(projectId: string, testCaseIds: string[], status: string): Promise<{ count: number }> {
+    const response = await this.apiClient.patch<{ count: number }>(
+      `/projects/${projectId}/test-cases/bulk-update-status`,
+      { testCaseIds, status }
+    );
+    return response;
+  }
 } 

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { TrendChart } from '@/components/dashboard/TrendChart';
-import { TagHeatmap } from '@/components/dashboard/TagHeatmap';
+import { TrendChart } from '@/components/dashboard/trend-chart';
+import { TagHeatmap } from '@/components/dashboard/tag-heat-map';
 import type { DashboardStats } from '@/lib/dashboard/dashboard-service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, CheckCircle2, Layers3, PlaySquare } from 'lucide-react';
