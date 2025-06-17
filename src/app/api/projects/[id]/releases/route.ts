@@ -136,23 +136,51 @@ export async function POST(
       );
     }
 
-    const release = await prisma.release.create({
-      data: {
-        project: {
-          connect: { id: projectId }
+    // Create release and automatically include all current test cases
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the release
+      const release = await tx.release.create({
+        data: {
+          project: {
+            connect: { id: projectId }
+          },
+          name,
+          version,
+          description,
+          startDate: new Date(startDate),
+          endDate: endDate ? new Date(endDate) : null,
+          status: status || 'planning',
+          createdBy: userEmail,
+          updatedBy: userEmail,
+        }
+      });
+
+      // Get all test cases in the project with their current versions
+      const testCases = await tx.testCase.findMany({
+        where: { projectId },
+        select: {
+          id: true,
+          version: true,
         },
-        name,
-        version,
-        description,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
-        status: status || 'planning',
-        createdBy: userEmail,
-        updatedBy: userEmail,
+      });
+
+      // Create release test case mappings for all test cases
+      if (testCases.length > 0) {
+        await tx.releaseTestCase.createMany({
+          data: testCases.map(testCase => ({
+            releaseId: release.id,
+            testCaseId: testCase.id,
+            version: testCase.version,
+            createdBy: userEmail,
+            updatedBy: userEmail,
+          })),
+        });
       }
+
+      return release;
     });
 
-    return NextResponse.json(release);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error creating release:', error);
     return NextResponse.json(

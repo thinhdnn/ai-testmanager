@@ -315,77 +315,80 @@ export function FixtureTable({ fixtures = [], projectId, pagination, filters }: 
     <>
       <Card>
         <CardHeader>
-          <CardDescription>
-            Showing {filteredAndSortedFixtures.length > 0 ? startItem : 0}-{endItem} of {filteredAndSortedFixtures.length} fixtures
-          </CardDescription>
-          
-          <div className="flex flex-col sm:flex-row gap-2 mt-2">
-            <div className="flex w-full sm:w-auto gap-2">
-              <div className="relative flex-1">
-                <Input
-                  placeholder="Search fixtures..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="w-full sm:w-auto pl-9"
-                />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                {searchTerm && (
-                  <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <X className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                )}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex w-full sm:w-auto gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Search fixtures..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="w-[180px] h-9 pl-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]"
+                  />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  {searchTerm && (
+                    <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Select value={typeFilter} onValueChange={handleTypeChange}>
+                  <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/fixtures/new`)}>
+                  New Fixture
+                </Button>
               </div>
             </div>
             
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Select value={typeFilter} onValueChange={handleTypeChange}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {typeOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/fixtures/new`)}>
-                New Fixture
-              </Button>
+            {/* Display count information */}
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredAndSortedFixtures.length > 0 ? startItem : 0}-{endItem} of {filteredAndSortedFixtures.length} fixtures
             </div>
+            
+            {/* Display active filters */}
+            {(searchTerm || typeFilter !== 'all') && (
+              <div className="flex flex-wrap gap-2">
+                <div className="text-sm text-muted-foreground mr-2">Active filters:</div>
+                
+                {searchTerm && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Search: {searchTerm}
+                    <button onClick={clearSearch} className="ml-1">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                
+                {typeFilter !== 'all' && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Type: {typeFilter}
+                    <button onClick={() => setTypeFilter('all')} className="ml-1">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                
+                <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-6">
+                  Clear all
+                </Button>
+              </div>
+            )}
           </div>
-          
-          {/* Display active filters */}
-          {(searchTerm || typeFilter !== 'all') && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              <div className="text-sm text-muted-foreground mr-2">Active filters:</div>
-              
-              {searchTerm && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  Search: {searchTerm}
-                  <button onClick={clearSearch} className="ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              {typeFilter !== 'all' && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  Type: {typeFilter}
-                  <button onClick={() => setTypeFilter('all')} className="ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-6">
-                Clear all
-              </Button>
-            </div>
-          )}
         </CardHeader>
         
         <CardContent>

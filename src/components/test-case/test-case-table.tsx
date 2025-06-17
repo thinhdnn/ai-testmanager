@@ -440,135 +440,138 @@ export function TestCaseTable({
     <>
       <Card>
         <CardHeader>
-          <CardDescription>
-            Showing {filteredAndSortedTestCases.length > 0 ? startItem : 0}-{endItem} of {filteredAndSortedTestCases.length} test cases
-          </CardDescription>
-          
-          <div className="flex flex-col sm:flex-row gap-2 mt-2">
-            <div className="flex w-full sm:w-auto gap-2">
-              <div className="relative flex-1">
-                <Input
-                  placeholder="Search test cases..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="w-[180px] h-9 pl-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]"
-                />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                {searchTerm && (
-                  <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <X className="h-4 w-4 text-muted-foreground" />
-                  </button>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex w-full sm:w-auto gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Search test cases..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="w-[180px] h-9 pl-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]"
+                  />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  {searchTerm && (
+                    <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Select value={statusFilter} onValueChange={handleStatusChange}>
+                  <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                {selectedTestCases.length > 0 && (
+                  <>
+                    <Select value={bulkStatus} onValueChange={setBulkStatus}>
+                      <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
+                        <SelectValue placeholder="Set status..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.filter(option => option.value !== 'all').map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleBulkStatusUpdate}
+                      disabled={!bulkStatus || isUpdatingStatus}
+                    >
+                      {isUpdatingStatus ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          Update Status ({selectedTestCases.length})
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
+                
+                {onRunSelected && selectedTestCases.length > 0 && (
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    onClick={runSelectedTestCases}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Run Selected ({selectedTestCases.length})
+                  </Button>
+                )}
+                
+                <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/test-cases/new`)}>
+                  New Test Case
+                </Button>
               </div>
             </div>
             
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Select value={statusFilter} onValueChange={handleStatusChange}>
-                <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {selectedTestCases.length > 0 && (
-                <>
-                  <Select value={bulkStatus} onValueChange={setBulkStatus}>
-                    <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
-                      <SelectValue placeholder="Set status..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.filter(option => option.value !== 'all').map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleBulkStatusUpdate}
-                    disabled={!bulkStatus || isUpdatingStatus}
-                  >
-                    {isUpdatingStatus ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        Update Status ({selectedTestCases.length})
-                      </>
-                    )}
-                  </Button>
-                </>
-              )}
-              
-              {onRunSelected && selectedTestCases.length > 0 && (
-                <Button 
-                  variant="default" 
-                  size="sm"
-                  onClick={runSelectedTestCases}
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Run Selected ({selectedTestCases.length})
+            {/* Display count information */}
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredAndSortedTestCases.length > 0 ? startItem : 0}-{endItem} of {filteredAndSortedTestCases.length} test cases
+            </div>
+            
+            {/* Display active filters */}
+            {(searchTerm || statusFilter !== 'all' || tagsFilter.length > 0) && (
+              <div className="flex flex-wrap gap-2">
+                <div className="text-sm text-muted-foreground mr-2">Active filters:</div>
+                
+                {searchTerm && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Search: {searchTerm}
+                    <button onClick={clearSearch} className="ml-1">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                
+                {statusFilter !== 'all' && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    Status: {statusFilter}
+                    <button onClick={() => setStatusFilter('all')} className="ml-1">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                
+                {tagsFilter.map((tag, index) => (
+                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                    Tag: {tag}
+                    <button onClick={() => {
+                      const newTags = [...tagsFilter];
+                      newTags.splice(index, 1);
+                      setTagsFilter(newTags);
+                    }} className="ml-1">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                
+                <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-6">
+                  Clear all
                 </Button>
-              )}
-              
-              <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/test-cases/new`)}>
-                New Test Case
-              </Button>
-            </div>
+              </div>
+            )}
           </div>
-          
-          {/* Display active filters */}
-          {(searchTerm || statusFilter !== 'all' || tagsFilter.length > 0) && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              <div className="text-sm text-muted-foreground mr-2">Active filters:</div>
-              
-              {searchTerm && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  Search: {searchTerm}
-                  <button onClick={clearSearch} className="ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              {statusFilter !== 'all' && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  Status: {statusFilter}
-                  <button onClick={() => setStatusFilter('all')} className="ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              {tagsFilter.map((tag, index) => (
-                <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                  Tag: {tag}
-                  <button onClick={() => {
-                    const newTags = [...tagsFilter];
-                    newTags.splice(index, 1);
-                    setTagsFilter(newTags);
-                  }} className="ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              
-              <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-6">
-                Clear all
-              </Button>
-            </div>
-          )}
         </CardHeader>
         
         <CardContent>

@@ -18,6 +18,8 @@ import { RunTestDialog } from '@/components/test-case/run-test-dialog';
 import { TestResultDialog } from '@/components/test-case/test-result-dialog';
 import { useTestResults } from '@/lib/api/hooks/use-test-results';
 import { CustomPagination } from '@/components/ui/custom-pagination';
+import { ReleaseTable } from '@/components/releases/release-table';
+import { useReleases } from '@/lib/api/hooks/use-releases';
 
 interface Project {
   id: string;
@@ -30,6 +32,7 @@ interface Project {
   testCases: any[];
   fixtures: any[];
   testResults: any[];
+  releases?: any[];
 }
 
 export default function ProjectDetailPage() {
@@ -49,6 +52,7 @@ export default function ProjectDetailPage() {
     { value: 'overview', label: 'Overview' },
     { value: 'test-cases', label: `Test Cases (${project?.testCases?.length || 0})` },
     { value: 'fixtures', label: `Fixtures (${project?.fixtures?.length || 0})` },
+    { value: 'releases', label: `Releases` },
     { value: 'results', label: `Results (${project?.testResults?.length || 0})` },
     { value: 'configuration', label: 'Configuration' },
   ];
@@ -72,7 +76,7 @@ export default function ProjectDetailPage() {
       return;
     }
     
-    // Check if the URL path indicates test-cases or fixtures
+    // Check if the URL path indicates test-cases, fixtures, or releases
     const path = window.location.pathname;
     if (path.endsWith('/test-cases')) {
       setActiveTab("test-cases");
@@ -83,6 +87,12 @@ export default function ProjectDetailPage() {
     } else if (path.endsWith('/fixtures')) {
       setActiveTab("fixtures");
       localStorage.setItem(storageKey, "fixtures");
+      // Clean up URL
+      window.history.replaceState(null, '', `/projects/${params.id}`);
+      return;
+    } else if (path.endsWith('/releases')) {
+      setActiveTab("releases");
+      localStorage.setItem(storageKey, "releases");
       // Clean up URL
       window.history.replaceState(null, '', `/projects/${params.id}`);
       return;
@@ -133,6 +143,8 @@ export default function ProjectDetailPage() {
       window.history.replaceState(null, '', `/projects/${params.id}/test-cases`);
     } else if (value === "fixtures") {
       window.history.replaceState(null, '', `/projects/${params.id}/fixtures`);
+    } else if (value === "releases") {
+      window.history.replaceState(null, '', `/projects/${params.id}/releases`);
     } else {
       window.history.replaceState(null, '', `/projects/${params.id}`);
     }
@@ -378,19 +390,6 @@ export default function ProjectDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const allTestCaseIds = project.testCases.map(tc => tc.id);
-                      handleRunSelectedTests(allTestCaseIds);
-                    }}
-                  >
-                    <Play className="mr-2 h-4 w-4" />
-                    Run All Test Cases
-                  </Button>
-                </div>
                 <TestCaseTable
                   testCases={project.testCases.map(testCase => ({
                     ...testCase,
@@ -455,6 +454,11 @@ export default function ProjectDetailPage() {
             )}
           </div>
         )}
+        {activeTab === 'releases' && (
+          <div>
+            <ReleasesTabContent projectId={project.id} />
+          </div>
+        )}
         {activeTab === 'results' && (
           <div>
             <TestResultsSection projectId={project.id} />
@@ -492,6 +496,57 @@ function getEnvironmentVariant(environment: string): 'default' | 'secondary' | '
     default:
       return 'outline';
   }
+}
+
+// Add new component for releases tab
+function ReleasesTabContent({ projectId }: { projectId: string }) {
+  const {
+    releases,
+    isLoading,
+    error,
+  } = useReleases(projectId);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin h-8 w-8 border-4 border-green-500 rounded-full border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12 bg-destructive/10 rounded-lg border border-destructive/20">
+        <p className="text-destructive">Error loading releases: {error.message}</p>
+      </div>
+    );
+  }
+
+  if (!releases || releases.length === 0) {
+    return (
+      <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
+        <div className="bg-primary/10 rounded-full p-4 mx-auto w-fit mb-4">
+          <PlusCircle className="h-10 w-10 text-primary" />
+        </div>
+        <h3 className="text-xl font-medium mb-2">No releases yet</h3>
+        <p className="text-muted-foreground mb-6">
+          Create your first release to track project milestones
+        </p>
+        <Button asChild>
+          <Link href={`/projects/${projectId}/releases/new`}>
+            Create Release
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <ReleaseTable
+      projectId={projectId}
+      releases={releases}
+    />
+  );
 }
 
 // Add new component for test results with pagination
