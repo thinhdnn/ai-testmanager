@@ -449,7 +449,7 @@ export function TestCaseTable({
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="w-[180px] h-9 pl-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]"
+                    className="w-[180px] h-9 pl-9 shadow-md hover:shadow-lg transition-shadow"
                   />
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   {searchTerm && (
@@ -462,7 +462,7 @@ export function TestCaseTable({
               
               <div className="flex gap-2 w-full sm:w-auto">
                 <Select value={statusFilter} onValueChange={handleStatusChange}>
-                  <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
+                  <SelectTrigger className="w-[180px] h-9 shadow-md hover:shadow-lg transition-shadow">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -477,7 +477,7 @@ export function TestCaseTable({
                 {selectedTestCases.length > 0 && (
                   <>
                     <Select value={bulkStatus} onValueChange={setBulkStatus}>
-                      <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
+                      <SelectTrigger className="w-[180px] h-9 shadow-md hover:shadow-lg transition-shadow">
                         <SelectValue placeholder="Set status..." />
                       </SelectTrigger>
                       <SelectContent>

@@ -3,7 +3,7 @@ import { ReleaseService } from "@/lib/api/services";
 
 const releaseService = new ReleaseService();
 
-export function useReleases(projectId: string) {
+export function useReleases(projectId: string | 'all') {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortField, setSortField] = useState<string>("updatedAt");
@@ -18,13 +18,21 @@ export function useReleases(projectId: string) {
       try {
         setIsLoading(true);
         setError(null);
-        const result = await releaseService.getReleases(projectId, {
-          page,
-          pageSize,
-          sortField,
-          sortOrder,
-          search,
-        });
+        const result = projectId === 'all' 
+          ? await releaseService.getAllReleases({
+              page,
+              pageSize,
+              sortField,
+              sortOrder,
+              search,
+            })
+          : await releaseService.getReleases(projectId, {
+              page,
+              pageSize,
+              sortField,
+              sortOrder,
+              search,
+            });
         setData(result);
       } catch (err) {
         setError(err);

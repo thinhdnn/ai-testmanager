@@ -273,8 +273,8 @@ export default function ProjectDetailPage() {
         {tabList.map(tab => (
           <button
             key={tab.value}
-            className={`px-5 py-2 border border-black font-medium transition-all duration-150
-              ${activeTab === tab.value ? 'bg-yellow-300 font-bold' : 'bg-transparent'}
+            className={`px-3 py-1.5 border-2 border-foreground text-sm font-medium transition-all duration-150 rounded-md
+              ${activeTab === tab.value ? 'bg-primary text-primary-foreground shadow-[2px_2px_0px_0px_hsl(var(--foreground))] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]' : 'bg-transparent hover:bg-accent hover:text-accent-foreground'}
             `}
             onClick={() => handleTabChange(tab.value)}
           >

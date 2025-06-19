@@ -13,7 +13,7 @@ export interface ReleaseListParams {
 }
 
 export interface ReleaseListResponse {
-  releases: (Release & { testCaseCount: number })[];
+  releases: (Release & { testCaseCount: number; project?: { id: string; name: string } })[];
   pagination: {
     total: number;
     page: number;
@@ -53,6 +53,22 @@ export class ReleaseService {
 
     const query = queryParams.toString();
     const url = `/projects/${projectId}/releases${query ? `?${query}` : ''}`;
+    return this.apiClient.get<ReleaseListResponse>(url);
+  }
+
+  async getAllReleases(params?: ReleaseListParams) {
+    const queryParams = new URLSearchParams();
+    
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.set(key, value.toString());
+        }
+      });
+    }
+
+    const query = queryParams.toString();
+    const url = `/releases${query ? `?${query}` : ''}`;
     return this.apiClient.get<ReleaseListResponse>(url);
   }
 

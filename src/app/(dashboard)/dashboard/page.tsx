@@ -116,7 +116,7 @@ interface StatCardProps {
 
 function StatCard({ title, value, description, valueClassName, icon }: StatCardProps) {
   return (
-    <Card className="shadow-sm hover:shadow transition-shadow">
+    <Card>
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <div className="space-y-0.5">
           <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>

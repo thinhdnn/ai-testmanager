@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 96%; /* Lighter Bluish Gray */
+    --foreground: 0 0% 0%;   /* Black */
+
+    --card: 0 0% 100%;        /* White */
+    --card-foreground: 0 0% 0%; /* Black */
+ 
+    --popover: 0 0% 100%;     /* White */
+    --popover-foreground: 0 0% 0%; /* Black */
+ 
+    --primary: 220 70% 55%;   /* Slightly darker Retro Blue */
+    --primary-foreground: 0 0% 100%; /* White */
+ 
+    --secondary: 220 15% 90%; /* Light Gray/Blue for secondary elements/tags */
+    --secondary-foreground: 0 0% 0%; /* Black */
+ 
+    --muted: 220 20% 98%;      /* Even Lighter Bluish Gray for muted backgrounds */
+    --muted-foreground: 0 0% 30%; /* Dark Gray for muted text */
+ 
+    --accent: 220 70% 90%;    /* Lighter blue for hover states on outline/ghost */
+    --accent-foreground: 220 70% 30%; /* Darker blue for text on accent */
+ 
+    --destructive: 0 75% 58%; /* Slightly adjusted Retro Red */
+    --destructive-foreground: 0 0% 100%; /* white - Text on Destructive */
+
+    --border: 0 0% 0%;        /* Black */
+    --input: 0 0% 0%;         /* Black */
+    --ring: 45 100% 55%;      /* Mustard Yellow for focus rings */
+
+    --radius: 0.25rem;
+    --radius-sm: 0.25rem;
+    --radius-lg: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 220 15% 12%; /* Darker Blue/Gray */
+    --foreground: 220 10% 85%; /* Lighter Bluish Gray text */
+
+    --card: 220 15% 18%;       /* Slightly Lighter Dark Card Background */
+    --card-foreground: 220 10% 85%; /* Lighter Bluish Gray text */
+
+    --popover: 220 15% 18%;    /* Slightly Lighter Dark Popover Background */
+    --popover-foreground: 220 10% 85%; /* Lighter Bluish Gray text */
+
+    --primary: 220 70% 60%;  /* Adjusted Retro Blue for dark mode */
+    --primary-foreground: 0 0% 100%; /* White */
+
+    --secondary: 220 15% 30%;  /* Darker Blue/Gray for secondary elements */
+    --secondary-foreground: 220 10% 80%; /* Lighter Bluish Gray text */
+
+    --muted: 220 15% 15%;      /* Darker Muted Blue/Gray background */
+    --muted-foreground: 220 10% 55%; /* Muted Bluish Gray text */
+
+    --accent: 220 70% 30%;   /* Darker blue for hover states on outline/ghost */
+    --accent-foreground: 220 10% 90%; /* Lighter blue for text on accent */
+
+    --destructive: 0 75% 62%; /* Adjusted Retro Red for dark mode */
+    --destructive-foreground: 0 0% 100%; /* White */
+
+    --border: 220 15% 30%;   /* Darker bluish gray for borders */
+    --input: 220 15% 30%;    /* Darker bluish gray for input borders */
+    --ring: 45 100% 55%;     /* Slightly brighter Mustard Yellow for focus rings */
+  }
+} 

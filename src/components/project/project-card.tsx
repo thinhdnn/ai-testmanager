@@ -13,7 +13,7 @@ interface ProjectCardProps {
 export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <Link href={`/projects/${project.id}`} className="group block h-full">
-      <Card className="h-full overflow-hidden transition-all duration-300 border-border hover:border-primary/50 hover:shadow-md group-hover:shadow-sm relative">
+      <Card className="h-full overflow-hidden transition-all duration-300 hover:border-primary/50 relative">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         
         <div className="absolute top-3 right-3 size-7 rounded-full bg-card border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transform translate-y-1 group-hover:translate-y-0 transition-all duration-300">

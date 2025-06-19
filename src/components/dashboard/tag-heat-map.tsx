@@ -49,7 +49,7 @@ export function TagHeatmap({
           {sortedTags.map((tag) => (
             <div
               key={tag.name}
-              className={`flex flex-col items-center justify-center rounded-xl shadow-sm transition-all duration-150 ${getPassRateColor(tag.passRate)} ${getTextColor(tag.passRate)}`}
+              className={`flex flex-col items-center justify-center rounded-lg shadow-sm transition-all duration-150 ${getPassRateColor(tag.passRate)} ${getTextColor(tag.passRate)}`}
               style={{ minHeight: '90px', height: '110px', padding: '0.75rem' }}
             >
               <div className="font-semibold text-lg mb-1 text-center w-full">{tag.name}</div>

@@ -484,28 +484,28 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-bold mb-6">Settings</h1>
       <div className="flex mb-6 gap-2">
         <button
-          className={`px-5 py-2 border border-black font-medium transition-all duration-150
-            ${activeTab === 'general' ? 'bg-yellow-300 font-bold' : 'bg-transparent'}
+          className={`px-5 py-2 border-2 border-foreground font-medium transition-all duration-150 rounded-md
+            ${activeTab === 'general' ? 'bg-primary text-primary-foreground shadow-[2px_2px_0px_0px_hsl(var(--foreground))] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]' : 'bg-transparent hover:bg-accent hover:text-accent-foreground'}
           `}
           onClick={() => setActiveTab('general')}
         >
           General
         </button>
         <button
-          className={`px-5 py-2 border border-black font-medium transition-all duration-150
-            ${activeTab === 'ai' ? 'bg-yellow-300 font-bold' : 'bg-transparent'}
+          className={`px-5 py-2 border-2 border-foreground font-medium transition-all duration-150 rounded-md
+            ${activeTab === 'ai' ? 'bg-primary text-primary-foreground shadow-[2px_2px_0px_0px_hsl(var(--foreground))] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]' : 'bg-transparent hover:bg-accent hover:text-accent-foreground'}
           `}
           onClick={() => setActiveTab('ai')}
         >
           AI Settings
         </button>
         <button
-          className={`px-5 py-2 border border-black font-medium transition-all duration-150
-            ${activeTab === 'rbac' ? 'bg-yellow-300 font-bold' : 'bg-transparent'}
+          className={`px-5 py-2 border-2 border-foreground font-medium transition-all duration-150 rounded-md
+            ${activeTab === 'rbac' ? 'bg-primary text-primary-foreground shadow-[2px_2px_0px_0px_hsl(var(--foreground))] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]' : 'bg-transparent hover:bg-accent hover:text-accent-foreground'}
           `}
           onClick={() => setActiveTab('rbac')}
         >
-          RBAC Editor
+          RBAC
         </button>
       </div>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-black">

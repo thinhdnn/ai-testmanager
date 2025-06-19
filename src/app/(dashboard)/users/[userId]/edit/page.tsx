@@ -31,19 +31,19 @@ function UserEditTabs({ userId }: { userId: string }) {
     <div className="w-full max-w-3xl">
       <div className="flex gap-2 mb-4">
         <button
-          className={`px-5 py-2 border border-black font-medium transition-all duration-150 ${tab === 'email' ? 'bg-yellow-300 font-bold' : 'bg-transparent'}`}
+          className={`px-5 py-2 border-2 border-foreground font-medium transition-all duration-150 rounded-md ${tab === 'email' ? 'bg-primary text-primary-foreground shadow-[2px_2px_0px_0px_hsl(var(--foreground))] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]' : 'bg-transparent hover:bg-accent hover:text-accent-foreground'}`}
           onClick={() => setTab('email')}
         >
           Change Email
         </button>
         <button
-          className={`px-5 py-2 border border-black font-medium transition-all duration-150 ${tab === 'password' ? 'bg-yellow-300 font-bold' : 'bg-transparent'}`}
+          className={`px-5 py-2 border-2 border-foreground font-medium transition-all duration-150 rounded-md ${tab === 'password' ? 'bg-primary text-primary-foreground shadow-[2px_2px_0px_0px_hsl(var(--foreground))] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]' : 'bg-transparent hover:bg-accent hover:text-accent-foreground'}`}
           onClick={() => setTab('password')}
         >
           Change Password
         </button>
         <button
-          className={`px-5 py-2 border border-black font-medium transition-all duration-150 ${tab === 'roles' ? 'bg-yellow-300 font-bold' : 'bg-transparent'}`}
+          className={`px-5 py-2 border-2 border-foreground font-medium transition-all duration-150 rounded-md ${tab === 'roles' ? 'bg-primary text-primary-foreground shadow-[2px_2px_0px_0px_hsl(var(--foreground))] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]' : 'bg-transparent hover:bg-accent hover:text-accent-foreground'}`}
           onClick={() => setTab('roles')}
         >
           Manage Roles

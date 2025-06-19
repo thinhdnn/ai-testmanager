@@ -36,29 +36,33 @@ type SortDirection = 'asc' | 'desc' | null;
 // Type for sorting field  
 type SortField = 'createdAt' | 'startDate' | 'endDate' | null;
 
-interface ReleaseWithTestCount extends Release {
-  testCaseCount: number;
+interface ReleaseWithProject extends Release {
+  project?: {
+    id: string;
+    name: string;
+  };
+  testCaseCount?: number;
 }
 
 interface ReleaseTableProps {
-  projectId: string;
-  releases: ReleaseWithTestCount[];
+  projectId?: string;
+  releases: ReleaseWithProject[];
 }
 
-const getReleaseStatusColor = (status: string) => {
+function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   switch (status.toLowerCase()) {
     case 'planning':
-      return 'bg-blue-100 text-blue-800';
+      return 'secondary';
     case 'in_progress':
-      return 'bg-yellow-100 text-yellow-800';
+      return 'default';
     case 'completed':
-      return 'bg-green-100 text-green-800';
+      return 'outline';
     case 'cancelled':
-      return 'bg-red-100 text-red-800';
+      return 'destructive';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'default';
   }
-};
+}
 
 export function ReleaseTable({
   projectId,
@@ -68,7 +72,7 @@ export function ReleaseTable({
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
 
   // Status options
@@ -180,7 +184,7 @@ export function ReleaseTable({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="w-[180px] h-9 pl-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]"
+                className="w-[180px] h-9 pl-9 shadow-md hover:shadow-lg transition-shadow"
               />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               {searchTerm && (
@@ -191,7 +195,7 @@ export function ReleaseTable({
             </div>
             
             <Select value={statusFilter} onValueChange={handleStatusChange}>
-              <SelectTrigger className="w-[180px] h-9 shadow-[2px_2px_0px_0px_hsl(var(--foreground))]">
+              <SelectTrigger className="w-[180px] h-9 shadow-md hover:shadow-lg transition-shadow">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -203,44 +207,19 @@ export function ReleaseTable({
               </SelectContent>
             </Select>
             
-            <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/releases/new`)}>
-              New Release
-            </Button>
+            {projectId && (
+              <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/releases/new`)}>
+                New Release
+              </Button>
+            )}
           </div>
           
           {/* Display count information */}
           <div className="text-sm text-muted-foreground">
-            Showing {filteredAndSortedReleases.length > 0 ? '1' : '0'}-{filteredAndSortedReleases.length} of {filteredAndSortedReleases.length} releases
+            {filteredAndSortedReleases.length} release{filteredAndSortedReleases.length !== 1 ? 's' : ''} found
+            {searchTerm && ` matching "${searchTerm}"`}
+            {statusFilter !== 'all' && ` with status "${statusFilter}"`}
           </div>
-          
-          {/* Display active filters */}
-          {(searchTerm || statusFilter !== 'all') && (
-            <div className="flex flex-wrap gap-2">
-              <div className="text-sm text-muted-foreground mr-2">Active filters:</div>
-              
-              {searchTerm && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  Search: {searchTerm}
-                  <button onClick={clearSearch} className="ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              {statusFilter !== 'all' && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  Status: {statusFilter}
-                  <button onClick={() => setStatusFilter('all')} className="ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              
-              <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-6">
-                Clear all
-              </Button>
-            </div>
-          )}
         </div>
       </CardHeader>
       
@@ -255,13 +234,15 @@ export function ReleaseTable({
             >
               Clear all filters
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/projects/${projectId}/releases/new`)}
-              className="mt-4"
-            >
-              Create your first release
-            </Button>
+            {projectId && (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/projects/${projectId}/releases/new`)}
+                className="mt-4"
+              >
+                Create your first release
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -269,6 +250,7 @@ export function ReleaseTable({
               <TableHeader>
                 <TableRow className="h-10 hover:bg-transparent">
                   <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Name</TableHead>
+                  <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Project</TableHead>
                   <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Version</TableHead>
                   <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</TableHead>
                   <TableHead 
@@ -300,37 +282,23 @@ export function ReleaseTable({
               </TableHeader>
               <TableBody>
                 {filteredAndSortedReleases.map((release) => (
-                  <TableRow key={release.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                    <TableCell className="p-4 align-middle font-medium">
-                      <Link 
-                        href={`/projects/${projectId}/releases/${release.id}`}
-                        className="text-black hover:underline text-sm"
-                      >
-                        {release.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="p-4 align-middle">
-                      <Badge variant="outline" className="text-xs">
-                        {release.version}
+                  <TableRow
+                    key={release.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => router.push(`/projects/${release.projectId}/releases/${release.id}`)}
+                  >
+                    <TableCell className="px-4 py-2">{release.name}</TableCell>
+                    <TableCell className="px-4 py-2">{release.project?.name}</TableCell>
+                    <TableCell className="px-4 py-2">{release.version}</TableCell>
+                    <TableCell className="px-4 py-2">
+                      <Badge variant={getStatusVariant(release.status)}>
+                        {release.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="p-4 align-middle">
-                      <Badge className={getReleaseStatusColor(release.status)}>
-                        {release.status.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="p-4 align-middle text-sm text-muted-foreground">
-                      {formatDate(release.startDate)}
-                    </TableCell>
-                    <TableCell className="p-4 align-middle text-sm text-muted-foreground">
-                      {release.endDate ? formatDate(release.endDate) : "-"}
-                    </TableCell>
-                    <TableCell className="p-4 align-middle text-sm">
-                      {release.testCaseCount}
-                    </TableCell>
-                    <TableCell className="p-4 align-middle text-sm text-muted-foreground">
-                      {formatDate(release.createdAt)}
-                    </TableCell>
+                    <TableCell className="px-4 py-2">{formatDate(new Date(release.startDate))}</TableCell>
+                    <TableCell className="px-4 py-2">{release.endDate ? formatDate(new Date(release.endDate)) : "-"}</TableCell>
+                    <TableCell className="px-4 py-2">{release.testCaseCount}</TableCell>
+                    <TableCell className="px-4 py-2">{formatDate(new Date(release.createdAt))}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
