@@ -86,8 +86,8 @@ export default function EditReleasePage() {
         name: release.name,
         version: release.version,
         description: release.description || '',
-        startDate: release.startDate.toISOString().split('T')[0],
-        endDate: release.endDate ? release.endDate.toISOString().split('T')[0] : '',
+        startDate: new Date(release.startDate).toISOString().split('T')[0],
+        endDate: release.endDate ? new Date(release.endDate).toISOString().split('T')[0] : '',
         status: release.status,
       });
     } catch (error) {

@@ -48,11 +48,14 @@ export default function ProjectDetailPage() {
   const [selectedTestResult, setSelectedTestResult] = useState<any | null>(null);
   const [isTestResultDialogOpen, setIsTestResultDialogOpen] = useState(false);
 
+  // Load releases data to get count for tab label
+  const { releases } = useReleases(params.id as string);
+
   const tabList = [
     { value: 'overview', label: 'Overview' },
     { value: 'test-cases', label: `Test Cases (${project?.testCases?.length || 0})` },
     { value: 'fixtures', label: `Fixtures (${project?.fixtures?.length || 0})` },
-    { value: 'releases', label: `Releases` },
+    { value: 'releases', label: `Releases (${releases?.length || 0})` },
     { value: 'results', label: `Results (${project?.testResults?.length || 0})` },
     { value: 'configuration', label: 'Configuration' },
   ];
@@ -456,7 +459,7 @@ export default function ProjectDetailPage() {
         )}
         {activeTab === 'releases' && (
           <div>
-            <ReleasesTabContent projectId={project.id} />
+            <ReleasesTabContent projectId={project.id} releases={releases} />
           </div>
         )}
         {activeTab === 'results' && (
@@ -499,12 +502,15 @@ function getEnvironmentVariant(environment: string): 'default' | 'secondary' | '
 }
 
 // Add new component for releases tab
-function ReleasesTabContent({ projectId }: { projectId: string }) {
+function ReleasesTabContent({ projectId, releases }: { projectId: string; releases?: any[] }) {
   const {
-    releases,
+    releases: releasesData,
     isLoading,
     error,
   } = useReleases(projectId);
+
+  // Use props releases if available, otherwise use hook data
+  const releasesToUse = releases || releasesData;
 
   if (isLoading) {
     return (
@@ -522,7 +528,7 @@ function ReleasesTabContent({ projectId }: { projectId: string }) {
     );
   }
 
-  if (!releases || releases.length === 0) {
+  if (!releasesToUse || releasesToUse.length === 0) {
     return (
       <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
         <div className="bg-primary/10 rounded-full p-4 mx-auto w-fit mb-4">
@@ -544,7 +550,7 @@ function ReleasesTabContent({ projectId }: { projectId: string }) {
   return (
     <ReleaseTable
       projectId={projectId}
-      releases={releases}
+      releases={releasesToUse}
     />
   );
 }
