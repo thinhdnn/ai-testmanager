@@ -644,7 +644,7 @@ export function TestCaseTable({
                       <TableCell className="p-4 align-middle font-medium">
                         <Link 
                           href={`/projects/${projectId}/test-cases/${testCase.id}`}
-                          className="text-black hover:underline text-sm"
+                          className="hover:underline text-sm text-foreground"
                         >
                           {testCase.name}
                         </Link>

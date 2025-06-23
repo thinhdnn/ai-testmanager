@@ -443,7 +443,7 @@ export function FixtureTable({ fixtures = [], projectId, pagination, filters }: 
                       <TableCell className="p-4 align-middle font-medium">
                         <Link 
                           href={`/projects/${projectId}/fixtures/${fixture.id}`}
-                          className="text-black hover:underline text-sm"
+                          className="hover:underline text-sm text-foreground"
                         >
                           {fixture.name}
                         </Link>

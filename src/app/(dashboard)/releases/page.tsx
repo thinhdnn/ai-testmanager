@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,23 +59,19 @@ export default function ReleasesPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Releases</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-4">
-
-            {isLoading ? (
-              <div className="flex justify-center items-center py-12">
-                <div className="animate-spin h-8 w-8 border-4 border-green-500 rounded-full border-t-transparent"></div>
-              </div>
-            ) : (
-              <ReleaseTable releases={releases} />
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold mb-2">Releases</h1>
+        <p className="text-muted-foreground">
+          Manage and track your project releases. View release status, associated test cases, and overall progress.
+        </p>
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin h-8 w-8 border-4 border-green-500 rounded-full border-t-transparent"></div>
+        </div>
+      ) : (
+        <ReleaseTable releases={releases} />
+      )}
     </div>
   );
 } 

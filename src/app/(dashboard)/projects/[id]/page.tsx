@@ -20,6 +20,24 @@ import { useTestResults } from '@/lib/api/hooks/use-test-results';
 import { CustomPagination } from '@/components/ui/custom-pagination';
 import { ReleaseTable } from '@/components/releases/release-table';
 import { useReleases } from '@/lib/api/hooks/use-releases';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Search, Eye } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
 
 interface Project {
   id: string;
@@ -560,41 +578,39 @@ function TestResultsSection({ projectId }: { projectId: string }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTestResult, setSelectedTestResult] = useState<any | null>(null);
   const [isTestResultDialogOpen, setIsTestResultDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [browserFilter, setBrowserFilter] = useState('all');
   
   const { data: testResults, pagination, loading, error } = useTestResults({
     projectId,
     page: currentPage,
     pageSize: 10,
     sortBy: 'createdAt',
-    sortOrder: 'desc'
+    sortOrder: 'desc',
+    search: searchTerm,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    browser: browserFilter !== 'all' ? browserFilter : undefined
   });
 
   if (loading) {
     return (
-      <div className="bg-card p-6 rounded-lg border shadow-sm">
-        <h3 className="text-xl font-semibold mb-6">Test Results</h3>
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin h-8 w-8 border-4 border-green-500 rounded-full border-t-transparent"></div>
-        </div>
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin h-8 w-8 border-4 border-green-500 rounded-full border-t-transparent"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card p-6 rounded-lg border shadow-sm">
-        <h3 className="text-xl font-semibold mb-6">Test Results</h3>
-        <div className="text-center py-12 bg-destructive/10 rounded-lg border border-destructive/20">
-          <p className="text-destructive">{error}</p>
-        </div>
+      <div className="text-center py-12 bg-destructive/10 rounded-lg border border-destructive/20">
+        <p className="text-destructive">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-card p-6 rounded-lg border shadow-sm">
-      <h3 className="text-xl font-semibold mb-6">Test Results</h3>
-      
+    <div>
       {(!testResults || testResults.length === 0) ? (
         <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed border-muted">
           <h3 className="text-xl font-medium mb-2">No test results yet</h3>
@@ -604,64 +620,131 @@ function TestResultsSection({ projectId }: { projectId: string }) {
         </div>
       ) : (
         <>
-          <div className="rounded-md border">
-            <div className="grid grid-cols-12 gap-4 p-4 bg-slate-50 border-b text-sm font-medium">
-              <div className="col-span-6">Test Case</div>
-              <div className="col-span-3">Status</div>
-              <div className="col-span-3"></div>
-            </div>
-            <div className="divide-y">
-              {testResults.map((result: any) => (
-                <div key={result.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-slate-50">
-                  <div className="col-span-6">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${result.success ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <div>
-                        <p className="font-medium">
-                          {result.name || `Test Run #${result.id.slice(0, 8)}`}
-                          <span className="ml-2 text-sm text-muted-foreground">
-                            ({result.testCaseExecutions?.length || 0} test cases)
-                          </span>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(result.createdAt)} • {result.executionTime ? (result.executionTime / 1000).toFixed(2) : '0'}s • {result.browser || 'chromium'}
-                        </p>
-                      </div>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex w-full sm:w-auto gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        placeholder="Search test results..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-[180px] h-9 pl-9 shadow-md hover:shadow-lg transition-shadow"
+                      />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>
-                  <div className="col-span-3">
-                    <Badge variant={result.success ? 'default' : 'destructive'}>
-                      {result.status}
-                    </Badge>
-                  </div>
-                  <div className="col-span-3 text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => {
-                        setSelectedTestResult(result);
-                        setIsTestResultDialogOpen(true);
-                      }}
-                    >
-                      View Details
-                    </Button>
+                  
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[180px] h-9 shadow-md hover:shadow-lg transition-shadow">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="passed">Passed</SelectItem>
+                        <SelectItem value="failed">Failed</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={browserFilter} onValueChange={setBrowserFilter}>
+                      <SelectTrigger className="w-[180px] h-9 shadow-md hover:shadow-lg transition-shadow">
+                        <SelectValue placeholder="Browser" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Browsers</SelectItem>
+                        <SelectItem value="chromium">Chromium</SelectItem>
+                        <SelectItem value="firefox">Firefox</SelectItem>
+                        <SelectItem value="webkit">WebKit</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-          
-          {pagination && (
-            <CustomPagination
-              currentPage={pagination.page}
-              totalPages={pagination.totalPages}
-              totalCount={pagination.totalCount}
-              pageSize={pagination.pageSize}
-              onPageChange={setCurrentPage}
-              hasNextPage={pagination.hasNextPage}
-              hasPreviousPage={pagination.hasPreviousPage}
-            />
-          )}
+
+                <div className="text-sm text-muted-foreground">
+                  Showing {testResults?.length ? `1-${testResults.length} of ${testResults.length}` : '0-0 of 0'} test results
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-10">Name</TableHead>
+                      <TableHead className="h-10">Status</TableHead>
+                      <TableHead className="h-10">Success</TableHead>
+                      <TableHead className="h-10">Browser</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {testResults.map((result: any) => (
+                      <TableRow key={result.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${result.success ? 'bg-green-500' : 'bg-red-500'}`} />
+                            <div>
+                              <p className="font-medium">
+                                {result.name || `Test Run #${result.id.slice(0, 8)}`}
+                                <span className="ml-2 text-sm text-muted-foreground">
+                                  ({result.testCaseExecutions?.length || 0} test cases)
+                                </span>
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(result.createdAt)} • {result.executionTime ? (result.executionTime / 1000).toFixed(2) : '0'}s • {result.browser || 'chromium'}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={result.success ? 'default' : 'destructive'}>
+                            {result.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={result.success ? 'default' : 'destructive'} className="capitalize">
+                            {result.success ? 'Yes' : 'No'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {result.browser || 'chromium'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setSelectedTestResult(result);
+                              setIsTestResultDialogOpen(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              {pagination && (
+                <CustomPagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalCount={pagination.totalCount}
+                  pageSize={pagination.pageSize}
+                  onPageChange={setCurrentPage}
+                  hasNextPage={pagination.hasNextPage}
+                  hasPreviousPage={pagination.hasPreviousPage}
+                />
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
 

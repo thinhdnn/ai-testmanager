@@ -121,6 +121,15 @@ export interface EditTestCasePageProps {
 }
 
 export interface PageProps {
-  params: Promise<any>;
-  searchParams: Promise<any>;
+  params: Promise<{
+    id?: string;
+    userId?: string;
+    testCaseId?: string;
+    fixtureId?: string;
+    releaseId?: string;
+    [key: string]: string | undefined;
+  }>;
+  searchParams?: Promise<{
+    [key: string]: string | string[] | undefined;
+  }>;
 } 

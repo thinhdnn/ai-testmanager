@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 
 export default async function UserDetailPage({ params }: PageProps) {
   const { userId } = await params;
+  if (!userId) return null;
 
   return (
     <div className="container mx-auto py-10">
