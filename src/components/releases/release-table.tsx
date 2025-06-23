@@ -284,21 +284,21 @@ export function ReleaseTable({
                 {filteredAndSortedReleases.map((release) => (
                   <TableRow
                     key={release.id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 h-16"
                     onClick={() => router.push(`/projects/${release.projectId}/releases/${release.id}`)}
                   >
-                    <TableCell className="px-4 py-2">{release.name}</TableCell>
-                    <TableCell className="px-4 py-2">{release.project?.name}</TableCell>
-                    <TableCell className="px-4 py-2">{release.version}</TableCell>
-                    <TableCell className="px-4 py-2">
+                    <TableCell className="px-4 py-4">{release.name}</TableCell>
+                    <TableCell className="px-4 py-4">{release.project?.name}</TableCell>
+                    <TableCell className="px-4 py-4">{release.version}</TableCell>
+                    <TableCell className="px-4 py-4">
                       <Badge variant={getStatusVariant(release.status)}>
                         {release.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-4 py-2">{formatDate(new Date(release.startDate))}</TableCell>
-                    <TableCell className="px-4 py-2">{release.endDate ? formatDate(new Date(release.endDate)) : "-"}</TableCell>
-                    <TableCell className="px-4 py-2">{release.testCaseCount}</TableCell>
-                    <TableCell className="px-4 py-2">{formatDate(new Date(release.createdAt))}</TableCell>
+                    <TableCell className="px-4 py-4">{formatDate(new Date(release.startDate))}</TableCell>
+                    <TableCell className="px-4 py-4">{release.endDate ? formatDate(new Date(release.endDate)) : "-"}</TableCell>
+                    <TableCell className="px-4 py-4">{release.testCaseCount}</TableCell>
+                    <TableCell className="px-4 py-4">{formatDate(new Date(release.createdAt))}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
